@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マルケト タスク管理</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ─── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .header-left h1 { font-size: 17px; font-weight: 700; color: #1e3a5f; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .overall-wrap { display: flex; align-items: center; gap: 10px; }
+    .overall-label { font-size: 12px; color: #888; }
+    .progress-bar-wrap { width: 180px; height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg,#22c55e,#16a34a); border-radius: 99px; transition: width .4s ease; }
+    .overall-pct { font-size: 14px; font-weight: 700; color: #22c55e; min-width: 38px; }
+    .btn-reset {
+      background: #fff; border: 1px solid #d1d5db; color: #6b7280;
+      padding: 6px 14px; border-radius: 7px; cursor: pointer; font-size: 13px;
+      font-family: inherit; transition: all .15s;
+    }
+    .btn-reset:hover { background: #fef2f2; border-color: #f87171; color: #ef4444; }
+
+    /* ─── Main ─── */
+    main { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+
+    /* ─── Tabs ─── */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 18px; border-radius: 99px; border: 2px solid #e5e7eb;
+      background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+      transition: all .2s; font-family: inherit;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tab .tab-pct {
+      font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+      background: #f3f4f6; color: #6b7280; transition: all .2s;
+    }
+    .tab.active { border-color: #3b82f6; background: #3b82f6; color: #fff; }
+    .tab.active .tab-pct { background: rgba(255,255,255,.25); color: #fff; }
+    .tab:hover:not(.active) { border-color: #3b82f6; color: #3b82f6; }
+    .tab-mastery { border-color: #8b5cf6 !important; }
+    .tab-mastery.active { background: #8b5cf6 !important; border-color: #8b5cf6 !important; }
+    .tab-mastery:hover:not(.active) { color: #8b5cf6 !important; }
+
+    /* ─── Legend ─── */
+    .legend { display: flex; gap: 16px; font-size: 12px; color: #9ca3af; margin-bottom: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+    /* ─── Category panel ─── */
+    .category-panel { display: none; }
+    .category-panel.active { display: block; }
+
+    .cat-header {
+      background: #fff; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .cat-title { font-size: 15px; font-weight: 700; color: #1e3a5f; white-space: nowrap; }
+    .cat-bar { flex: 1; height: 10px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+    .cat-score-text { font-size: 13px; font-weight: 700; color: #374151; white-space: nowrap; min-width: 72px; text-align: right; }
+
+    /* ─── Parent task ─── */
+    .parent-task { background: #fff; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.07); overflow: hidden; }
+    .parent-header {
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+      cursor: pointer; user-select: none; transition: background .15s;
+    }
+    .parent-header:hover { background: #f9fafb; }
+    .chevron { font-size: 11px; color: #9ca3af; transition: transform .2s; flex-shrink: 0; width: 16px; text-align: center; }
+    .chevron.open { transform: rotate(90deg); }
+    .parent-id-badge { font-size: 11px; font-weight: 700; color: #6b7280; background: #f3f4f6; padding: 2px 7px; border-radius: 5px; flex-shrink: 0; }
+    .parent-timing-badge { font-size: 11px; background: #eff6ff; color: #3b82f6; padding: 2px 8px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
+    .parent-work { font-size: 13px; color: #4b5563; flex: 1; line-height: 1.5; }
+    .parent-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .parent-mini-bar { width: 56px; height: 5px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+    .parent-mini-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+    .parent-pct-text { font-size: 12px; font-weight: 700; color: #374151; width: 30px; text-align: right; }
+    .parent-score-text { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+
+    /* ─── Child tasks ─── */
+    .child-list { border-top: 1px solid #f3f4f6; display: none; }
+    .child-list.open { display: block; }
+    .child-col-header {
+      padding: 6px 16px 6px 42px;
+      display: grid;
+      grid-template-columns: 1fr 50px 138px 90px 140px 90px 100px;
+      gap: 8px; align-items: center;
+      background: #f9fafb; border-bottom: 1px solid #f3f4f6;
+    }
+    .col-label { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; }
+    .child-row {
+      padding: 9px 16px 9px 42px;
+      display: grid;
+      grid-template-columns: 1fr 50px 138px 90px 140px 90px 100px;
+      gap: 8px; align-items: center;
+      border-bottom: 1px solid #f9fafb;
+      transition: background .15s;
+    }
+    .child-row:last-child { border-bottom: none; }
+    .child-row.status-進行中 { background: #fffbeb; }
+    .child-row.status-完了   { background: #f0fdf4; }
+    .child-name  { font-size: 13px; color: #374151; }
+    .child-score { font-size: 12px; color: #9ca3af; text-align: center; }
+
+    /* Status buttons */
+    .status-group { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #e5e7eb; }
+    .status-btn {
+      flex: 1; padding: 4px 4px; font-size: 11px; border: none;
+      background: #f9fafb; cursor: pointer; color: #9ca3af;
+      transition: all .15s; font-family: inherit; white-space: nowrap;
+    }
+    .status-btn:not(:last-child) { border-right: 1px solid #e5e7eb; }
+    .status-btn:hover { background: #f3f4f6; color: #374151; }
+    .status-btn.sel-未着手 { background: #e5e7eb; color: #4b5563; font-weight: 700; }
+    .status-btn.sel-進行中 { background: #fef3c7; color: #d97706; font-weight: 700; }
+    .status-btn.sel-完了   { background: #dcfce7; color: #16a34a; font-weight: 700; }
+
+    /* Mastery visual selector */
+    .mastery-visual {
+      display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+    }
+    .mastery-dot {
+      width: 20px; height: 20px; border-radius: 5px; border: 2px solid #e5e7eb;
+      background: #f3f4f6; transition: all .15s; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: transparent;
+      flex-shrink: 0;
+    }
+    .mastery-dot:hover { transform: scale(1.15); }
+    .mastery-dot.filled-0 { background: #f3f4f6; border-color: #e5e7eb; }
+    .mastery-dot.filled-1 { background: #fecaca; border-color: #f87171; }
+    .mastery-dot.filled-2 { background: #fed7aa; border-color: #fb923c; }
+    .mastery-dot.filled-3 { background: #bbf7d0; border-color: #4ade80; }
+    .mastery-dot.filled-4 { background: #6ee7b7; border-color: #10b981; }
+    .mastery-label { font-size: 10px; color: #9ca3af; white-space: nowrap; line-height: 1; }
+
+    /* Note input */
+    .field-input {
+      font-size: 12px; border: 1px solid #e5e7eb; border-radius: 6px;
+      padding: 4px 8px; width: 100%; font-family: inherit; color: #374151;
+      transition: border-color .15s; background: #fff;
+    }
+    .field-input:focus { outline: none; border-color: #93c5fd; }
+
+    /* ─── Mastery Summary Tab ─── */
+    .mastery-panel { display: none; }
+    .mastery-panel.active { display: block; }
+
+    .mastery-overview {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .mastery-cat-card {
+      background: #fff; border-radius: 12px; padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .mcc-title { font-size: 14px; font-weight: 700; color: #1e3a5f; margin-bottom: 10px; }
+    .mcc-bar-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .mcc-level-row { display: flex; align-items: center; gap: 8px; }
+    .mcc-level-label { font-size: 11px; color: #6b7280; width: 72px; white-space: nowrap; flex-shrink: 0; }
+    .mcc-level-bar { flex: 1; height: 8px; background: #f3f4f6; border-radius: 99px; overflow: hidden; }
+    .mcc-level-fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+    .mcc-level-count { font-size: 11px; color: #9ca3af; width: 20px; text-align: right; flex-shrink: 0; }
+    .mcc-avg { font-size: 13px; color: #6b7280; margin-top: 10px; }
+    .mcc-avg strong { color: #1e3a5f; }
+
+    .mastery-section-title {
+      font-size: 14px; font-weight: 700; color: #1e3a5f;
+      margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    /* Low mastery list */
+    .mastery-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 24px; }
+    .mastery-table { width: 100%; border-collapse: collapse; }
+    .mastery-table th { background: #f9fafb; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; padding: 8px 14px; text-align: left; }
+    .mastery-table td { padding: 9px 14px; font-size: 13px; border-top: 1px solid #f3f4f6; vertical-align: middle; }
+    .mastery-table tr:first-child td { border-top: none; }
+    .mastery-table tr:hover td { background: #f9fafb; }
+
+    .m-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .m0 { background: #f3f4f6; color: #6b7280; }
+    .m1 { background: #fecaca; color: #dc2626; }
+    .m2 { background: #fed7aa; color: #ea580c; }
+    .m3 { background: #bbf7d0; color: #16a34a; }
+    .m4 { background: #6ee7b7; color: #047857; }
+
+    .mastery-dots-sm { display: flex; gap: 2px; }
+    .md-sm { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* Assignee filter */
+    .mastery-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .mastery-filter-label { font-size: 13px; color: #6b7280; }
+    .filter-btn {
+      padding: 5px 12px; border-radius: 99px; border: 1px solid #e5e7eb;
+      background: #fff; cursor: pointer; font-size: 12px; font-family: inherit;
+      color: #6b7280; transition: all .15s;
+    }
+    .filter-btn.active { background: #8b5cf6; border-color: #8b5cf6; color: #fff; }
+    .filter-btn:hover:not(.active) { border-color: #8b5cf6; color: #8b5cf6; }
+
+    .cat-tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+
+    /* Radar-like distribution chart */
+    .mastery-dist-wrap { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.07); margin-bottom: 24px; }
+    .dist-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; margin-top: 10px; }
+    .dist-col { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; min-width: 0; }
+    .dist-bar { width: 100%; border-radius: 4px 4px 0 0; transition: height .4s ease; min-height: 2px; }
+    .dist-lbl { font-size: 10px; color: #9ca3af; text-align: center; white-space: normal; word-break: keep-all; line-height: 1.2; width: 100%; }
+    .dist-cnt { font-size: 11px; font-weight: 700; color: #374151; }
+
+    /* ─── Event meta card ─── */
+    .event-meta-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      border-left: 4px solid var(--cat-color, #3b82f6);
+    }
+    .event-meta-title {
+      font-size: 11px; font-weight: 700; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+    .event-meta-fields {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    }
+    .event-meta-field {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .event-meta-label {
+      font-size: 12px; font-weight: 600; color: #6b7280; white-space: nowrap;
+    }
+    .event-meta-input {
+      font-size: 13px; font-weight: 500; border: 1px solid #e5e7eb;
+      border-radius: 7px; padding: 5px 10px; font-family: inherit; color: #1e3a5f;
+      background: #f9fafb; transition: all .15s;
+    }
+    .event-meta-input:focus {
+      outline: none; border-color: var(--cat-color, #3b82f6);
+      background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+    }
+    .event-meta-input.name-input { width: 260px; }
+    .event-meta-input.count-input { width: 72px; text-align: center; }
+    .event-meta-date-input { width: 150px; }
+    .event-meta-preview {
+      font-size: 12px; color: #6b7280; margin-left: auto;
+      background: #f3f4f6; padding: 4px 10px; border-radius: 6px;
+      white-space: nowrap;
+    }
+    .event-meta-preview strong { color: #1e3a5f; }
+
+    /* ─── Carry-over / History ─── */
+    .btn-carryover {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 700; font-family: inherit;
+      color: #fff; background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      border: none; border-radius: 7px; padding: 6px 12px;
+      cursor: pointer; transition: opacity .15s; white-space: nowrap; margin-left: auto;
+    }
+    .btn-carryover:hover { opacity: .85; }
+    .btn-undo {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 700; font-family: inherit;
+      color: #6b7280; background: #fff;
+      border: 1.5px solid #d1d5db; border-radius: 7px; padding: 6px 12px;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .btn-undo:hover { border-color: #f87171; color: #ef4444; background: #fef2f2; }
+
+    .history-section {
+      background: #fff; border-radius: 12px; margin-top: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07); overflow: hidden;
+    }
+    .history-toggle {
+      width: 100%; background: none; border: none; font-family: inherit;
+      padding: 12px 18px; display: flex; align-items: center; gap: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 700; color: #6b7280;
+      transition: background .15s; text-align: left;
+    }
+    .history-toggle:hover { background: #f9fafb; }
+    .history-toggle .h-chevron { font-size: 10px; transition: transform .2s; }
+    .history-toggle .h-chevron.open { transform: rotate(90deg); }
+    .history-list { display: none; border-top: 1px solid #f3f4f6; }
+    .history-list.open { display: block; }
+    .history-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 18px; border-bottom: 1px solid #f9fafb; flex-wrap: wrap;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-event-name { font-size: 13px; font-weight: 600; color: #374151; flex: 1; min-width: 120px; }
+    .history-date { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+    .history-rate-wrap { display: flex; align-items: center; gap: 6px; }
+    .history-rate-bar { width: 80px; height: 6px; background: #f3f4f6; border-radius: 99px; overflow: hidden; }
+    .history-rate-fill { height: 100%; border-radius: 99px; }
+    .history-rate-val { font-size: 12px; font-weight: 700; color: #374151; min-width: 30px; }
+    .history-mastery-avg { font-size: 11px; color: #9ca3af; }
+    .history-empty { padding: 14px 18px; font-size: 13px; color: #9ca3af; }
+    .btn-restore {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; font-family: inherit;
+      color: #6366f1; background: #eef2ff;
+      border: 1.5px solid #c7d2fe; border-radius: 6px; padding: 4px 10px;
+      cursor: pointer; transition: all .15s; white-space: nowrap; margin-left: auto;
+    }
+    .btn-restore:hover { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+    /* ─── Video cell ─── */
+    .video-cell { display: flex; flex-direction: column; gap: 4px; }
+    .video-play-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; color: #fff;
+      background: #3b82f6; border-radius: 6px; padding: 4px 8px;
+      text-decoration: none; white-space: nowrap; transition: background .15s;
+    }
+    .video-play-btn:hover { background: #2563eb; }
+    .video-edit-btn {
+      font-size: 10px; color: #9ca3af; background: none; border: none;
+      cursor: pointer; padding: 0; font-family: inherit; line-height: 1;
+    }
+    .video-edit-btn:hover { color: #3b82f6; }
+    .video-add-btn {
+      font-size: 11px; color: #9ca3af; background: none;
+      border: 1px dashed #d1d5db; border-radius: 6px; padding: 4px 8px;
+      cursor: pointer; font-family: inherit; white-space: nowrap; transition: all .15s;
+    }
+    .video-add-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+    .video-url-input {
+      font-size: 11px; border: 1px solid #93c5fd; border-radius: 5px;
+      padding: 3px 6px; width: 100%; font-family: inherit; color: #374151;
+    }
+    .video-url-input:focus { outline: none; }
+
+    /* ─── Dashboard Tab ─── */
+    .dashboard-panel { display: none; }
+    .dashboard-panel.active { display: block; }
+
+    .db-section-title {
+      font-size: 14px; font-weight: 700; color: #1e3a5f;
+      margin: 20px 0 12px; padding-bottom: 8px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .db-section-title:first-child { margin-top: 0; }
+
+    /* Category comparison cards */
+    .db-cat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px; margin-bottom: 8px;
+    }
+    .db-cat-card {
+      background: #fff; border-radius: 12px; padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      border-top: 3px solid var(--cat-color);
+    }
+    .db-cat-name { font-size: 14px; font-weight: 700; color: #1e3a5f; margin-bottom: 14px; }
+    .db-metric-row { display: flex; flex-direction: column; gap: 8px; }
+    .db-metric { display: flex; flex-direction: column; gap: 4px; }
+    .db-metric-label {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .db-metric-name { font-size: 11px; color: #6b7280; font-weight: 600; }
+    .db-metric-value { font-size: 12px; font-weight: 700; color: #374151; }
+    .db-bar-track { height: 8px; background: #f3f4f6; border-radius: 99px; overflow: hidden; }
+    .db-bar-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+
+    /* Full comparison table */
+    .db-compare-wrap {
+      background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      overflow: hidden; margin-bottom: 24px;
+    }
+    .db-compare-table { width: 100%; border-collapse: collapse; }
+    .db-compare-table th {
+      background: #f9fafb; font-size: 11px; font-weight: 600; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: .05em; padding: 8px 14px; text-align: left;
+    }
+    .db-compare-table td { padding: 10px 14px; font-size: 13px; border-top: 1px solid #f3f4f6; vertical-align: middle; }
+    .db-compare-table tr:first-child td { border-top: none; }
+    .db-compare-table tr:hover td { background: #f9fafb; }
+    .db-task-name { color: #374151; }
+    .db-cat-badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+
+    /* Inline bar for table */
+    .db-inline-bar { display: flex; align-items: center; gap: 6px; }
+    .db-inline-track { flex: 1; height: 6px; background: #f3f4f6; border-radius: 99px; overflow: hidden; min-width: 60px; }
+    .db-inline-fill { height: 100%; border-radius: 99px; transition: width .4s; }
+    .db-inline-val { font-size: 11px; font-weight: 700; color: #374151; min-width: 28px; text-align: right; }
+
+    .gap-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700;
+    }
+    .gap-high   { background: #fecaca; color: #dc2626; }
+    .gap-mid    { background: #fed7aa; color: #ea580c; }
+    .gap-low    { background: #bbf7d0; color: #16a34a; }
+    .gap-none   { background: #f3f4f6; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>📋 マルケト タスク管理</h1>
+  </div>
+  <div class="header-right">
+    <div class="overall-wrap">
+      <span class="overall-label">全体進捗</span>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="overall-bar" style="width:0%"></div>
+      </div>
+      <span class="overall-pct" id="overall-pct">0%</span>
+    </div>
+    <button class="btn-reset" onclick="confirmReset()">🔄 リセット</button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs" id="tabs"></div>
+
+  <div class="legend" id="legend-area">
+    <span class="legend-item"><span class="legend-dot" style="background:#d1d5db"></span>未着手</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span>進行中 (×50%)</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>完了 (×100%)</span>
+  </div>
+
+  <div id="panels"></div>
+  <div id="mastery-panel" class="mastery-panel"></div>
+  <div id="dashboard-panel" class="dashboard-panel"></div>
+</main>
+
+<footer style="text-align:center;padding:24px 16px 32px;font-size:13px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:32px;background:#fff;">
+  ログイン方法が不明な場合は担当責任者（谷口）までご連絡ください
+</footer>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id:'A', name:'入試説明会', icon:'📝' },
+  { id:'B', name:'イベント',   icon:'🎪' },
+  { id:'C', name:'入試',       icon:'📚' },
+  { id:'D', name:'メルマガ',   icon:'📧' },
+];
+const CAT_COLORS = { '入試説明会':'#3b82f6','イベント':'#8b5cf6','入試':'#f59e0b','メルマガ':'#10b981' };
+const MASTERY_LABELS = ['未経験','教わりながら','手順書を見て','ほぼ自力','人に説明できる'];
+const MASTERY_COLORS = ['#d1d5db','#f87171','#fb923c','#4ade80','#10b981'];
+const MASTERY_FILL   = ['#f3f4f6','#fecaca','#fed7aa','#bbf7d0','#6ee7b7'];
+const MASTERY_BORDER = ['#e5e7eb','#f87171','#fb923c','#4ade80','#10b981'];
+
+const PARENTS = [
+  {id:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',work:'初期設定、フォーム公開案内、事前アンケート項目確認、事前アンケート設定',score:33},
+  {id:'A-02',cat:'入試説明会',timing:'2〜3週間前',work:'当日受付説明書・差込文書作成、事後アンケート項目確認、リマインドメール原稿確認依頼',score:20},
+  {id:'A-03',cat:'入試説明会',timing:'1〜2週間前',work:'差込文書確認依頼、リマインドメール流し込み、事後アンケート設定、返信確認',score:18},
+  {id:'A-04',cat:'入試説明会',timing:'3〜1日前',work:'リマインドメール配信、自動返信差し替え、事前アンケート送付、参加者名簿送付',score:12},
+  {id:'A-05',cat:'入試説明会',timing:'当日〜開催後',work:'当日対応、集計、事後アンケート送付、DB更新、報告',score:17},
+  {id:'B-01',cat:'イベント',timing:'1か月以上前',work:'フォーム作成、自動返信メール更新、フォーム動作確認',score:35},
+  {id:'B-02',cat:'イベント',timing:'開催前数週間',work:'申込者状況報告、申込者人数報告、申込者リスト共有',score:35},
+  {id:'B-03',cat:'イベント',timing:'1週間前後',work:'自動返信差し替え、リマインドメール流し込み、リマインドメール動作確認・配信設定完了報告',score:19},
+  {id:'B-04',cat:'イベント',timing:'3〜1日前〜当日後',work:'開催前日：リマインドメール配信・報告、開催当日：最新申込者数報告・申込者リスト提出、開催翌日：フォーム閉鎖・募集終了対応',score:11},
+  {id:'C-01',cat:'入試',timing:'2〜3週間前',work:'出願者情報Excel作成、紙資料・PDF受領、受領状況確認',score:40},
+  {id:'C-02',cat:'入試',timing:'1〜2週間前',work:'メールアドレス転記、返却用整理、マルケトと最新情報の照合',score:50},
+  {id:'C-03',cat:'入試',timing:'1週間前後〜当日後',work:'リマインドメール確認依頼、募集開始リマインド配信設定、報告、当日対応',score:10},
+  {id:'D-01',cat:'メルマガ',timing:'1週間前まで',work:'原稿作成、原稿確認ご依頼',score:65},
+  {id:'D-02',cat:'メルマガ',timing:'前日まで',work:'マルケト流し込み、配信設定',score:40},
+  {id:'D-03',cat:'メルマガ',timing:'当日〜配信後',work:'配信、配信報告、履歴整理',score:15},
+];
+
+const CHILDREN = [
+  {id:'A-01-1',pid:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',name:'初期設定',score:8},
+  {id:'A-01-2',pid:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',name:'フォーム公開案内',score:4},
+  {id:'A-01-3',pid:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',name:'事前アンケート項目確認依頼',score:7},
+  {id:'A-01-4',pid:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',name:'事前アンケート設定',score:8},
+  {id:'A-01-5',pid:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',name:'タスク表・進行表更新',score:6},
+  {id:'A-02-1',pid:'A-02',cat:'入試説明会',timing:'2〜3週間前',name:'当日受付説明書・差込文書作成',score:8},
+  {id:'A-02-2',pid:'A-02',cat:'入試説明会',timing:'2〜3週間前',name:'事後アンケート項目確認依頼',score:6},
+  {id:'A-02-3',pid:'A-02',cat:'入試説明会',timing:'2〜3週間前',name:'リマインドメール原稿確認依頼',score:6},
+  {id:'A-03-1',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'差込文書確認依頼',score:3},
+  {id:'A-03-2',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'リマインドメール流し込み',score:6},
+  {id:'A-03-3',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'事後アンケート設定・流し込み',score:6},
+  {id:'A-03-4',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'返信確認・関係者フォロー',score:3},
+  {id:'A-04-1',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'リマインドメール配信',score:4},
+  {id:'A-04-2',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'自動返信差し替え',score:4},
+  {id:'A-04-3',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'事前アンケート送付・参加者名簿送付',score:4},
+  {id:'A-05-1',pid:'A-05',cat:'入試説明会',timing:'当日',name:'当日対応・事前アンケート集計',score:2},
+  {id:'A-05-2',pid:'A-05',cat:'入試説明会',timing:'開催後1〜3日',name:'事後アンケート送付・配信報告',score:3},
+  {id:'A-05-3',pid:'A-05',cat:'入試説明会',timing:'開催後1〜4週間',name:'事前事後アンケート集計',score:3},
+  {id:'A-05-4',pid:'A-05',cat:'入試説明会',timing:'開催後1〜4週間',name:'顧客管理表更新・DB作成・重複削除・提出報告',score:9},
+  {id:'B-01-1',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム作成',score:15},
+  {id:'B-01-2',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'自動返信メール更新',score:10},
+  {id:'B-01-3',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム動作確認',score:10},
+  {id:'B-02-1',pid:'B-02',cat:'イベント',timing:'開催前数週間',name:'申込者状況・人数報告',score:20},
+  {id:'B-02-2',pid:'B-02',cat:'イベント',timing:'開催前数週間',name:'申込者リスト共有・提出',score:15},
+  {id:'B-03-1',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'自動返信メール差し替え',score:8},
+  {id:'B-03-2',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'リマインドメール流し込み',score:8},
+  {id:'B-03-3',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'開催前日：リマインドメール配信・報告',score:3},
+  {id:'B-04-3',pid:'B-04',cat:'イベント',timing:'当日',name:'開催当日：最新申込者数報告・申込者リスト提出',score:6},
+  {id:'B-04-4',pid:'B-04',cat:'イベント',timing:'開催後',name:'開催翌日：フォーム閉鎖・募集終了対応',score:5},
+  {id:'C-01-1',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'出願者情報Excel作成',score:20},
+  {id:'C-01-2',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'紙資料・PDF受領',score:10},
+  {id:'C-01-3',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'受領状況確認',score:10},
+  {id:'C-02-1',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'メールアドレス転記',score:20},
+  {id:'C-02-2',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'返却用整理',score:10},
+  {id:'C-02-3',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'マルケトと最新情報の照合',score:20},
+  {id:'C-03-1',pid:'C-03',cat:'入試',timing:'1週間前後',name:'リマインドメール確認依頼',score:5},
+  {id:'C-03-2',pid:'C-03',cat:'入試',timing:'1週間前後',name:'募集開始リマインド配信設定・報告',score:5},
+  {id:'D-01-3',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿作成',score:35},
+  {id:'D-01-4',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿確認ご依頼',score:30},
+  {id:'D-02-1',pid:'D-02',cat:'メルマガ',timing:'前日',name:'マルケト流し込み',score:25},
+  {id:'D-02-2',pid:'D-02',cat:'メルマガ',timing:'前日',name:'配信設定',score:15},
+  {id:'D-03-1',pid:'D-03',cat:'メルマガ',timing:'当日',name:'配信',score:10},
+  {id:'D-03-2',pid:'D-03',cat:'メルマガ',timing:'当日',name:'配信報告',score:5},
+];
+
+// ─── Firebase 初期化 ──────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyD6NWp2Csi7Q8cbJWQ_3tPewBBUBcMWKgM",
+  authDomain: "intercast-b4747.firebaseapp.com",
+  databaseURL: "https://intercast-b4747-default-rtdb.firebaseio.com",
+  projectId: "intercast-b4747",
+  storageBucket: "intercast-b4747.firebasestorage.app",
+  messagingSenderId: "747137309504",
+  appId: "1:747137309504:web:e608c092817f8d6f7878a5"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let state = {};
+let catMeta = {};
+let catHistory = {};
+function saveCatHistory(){ db.ref('/marketo/catHistory').set(catHistory||{}); }
+
+// 引き継ぎ直前のスナップショット（元に戻す用、ページ内メモリのみ）
+const undoSnapshots = {}; // { catName: { tasks, meta, historyId } }
+
+function getCatMeta(catName){
+  return catMeta[catName] || { eventName:'', count:'', date:'' };
+}
+function setCatMeta(catName, field, value){
+  if(!catMeta[catName]) catMeta[catName] = { eventName:'', count:'', date:'' };
+  catMeta[catName][field] = value;
+  db.ref('/marketo/catMeta').set(catMeta||{});
+  updateMetaPreview(catName);
+}
+function updateMetaPreview(catName){
+  const m = getCatMeta(catName);
+  const cat = CATEGORIES.find(c=>c.name===catName);
+  const el = document.getElementById('meta-preview-'+(cat?cat.id:''));
+  if(!el) return;
+  const parts = [];
+  if(m.eventName) parts.push(`<strong>${escHtml(m.eventName)}</strong>`);
+  if(m.count)     parts.push(`第${escHtml(m.count)}回`);
+  if(m.date)      parts.push(escHtml(m.date));
+  el.innerHTML = parts.length ? parts.join('　') : '未入力';
+}
+function getS(id){ return state[id]||{status:'未着手',assignee:'',mastery:0,note:'',videoUrl:''}; }
+function saveState(){ db.ref('/marketo/state').set(state||{}); }
+function setField(id,field,value){
+  if(!state[id]) state[id]={status:'未着手',assignee:'',mastery:0,note:''};
+  state[id][field]=value; saveState();
+}
+function reflectedPts(id,score){
+  const s=getS(id).status;
+  if(s==='完了') return score;
+  if(s==='進行中') return score*.5;
+  return 0;
+}
+function catProgress(cn){ const k=CHILDREN.filter(c=>c.cat===cn); const t=k.reduce((a,c)=>a+c.score,0); const d=k.reduce((a,c)=>a+reflectedPts(c.id,c.score),0); return t>0?Math.round(d/t*100):0; }
+function parentProgress(pid){ const k=CHILDREN.filter(c=>c.pid===pid); const t=k.reduce((a,c)=>a+c.score,0); const d=k.reduce((a,c)=>a+reflectedPts(c.id,c.score),0); return t>0?Math.round(d/t*100):0; }
+function overallProgress(){ const t=CHILDREN.reduce((a,c)=>a+c.score,0); const d=CHILDREN.reduce((a,c)=>a+reflectedPts(c.id,c.score),0); return t>0?Math.round(d/t*100):0; }
+
+// ─── Tabs ────────────────────────────────────────────────────────────────────
+let activeTab = '入試説明会';
+const openParents = new Set();
+let masteryFilter = 'all';
+
+function render(){ renderTabs(); renderPanels(); renderMasteryPanel(); updateProgress(); }
+
+
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  el.innerHTML = CATEGORIES.map(cat=>{
+    const pct=catProgress(cat.name);
+    return `<button class="tab ${cat.name===activeTab?'active':''}" onclick="switchTab('${cat.name}')">
+      ${cat.icon} ${cat.name}
+      <span class="tab-pct" id="tab-pct-${cat.id}">${pct}%</span>
+    </button>`;
+  }).join('')
+  + `<button class="tab ${activeTab==='dashboard'?'active':''}" style="border-color:${activeTab==='dashboard'?'#0ea5e9':'#e5e7eb'};${activeTab==='dashboard'?'background:#0ea5e9;color:#fff':''}" onclick="switchTab('dashboard')">🏠 ダッシュボード</button>`
+  + `<button class="tab tab-mastery ${activeTab==='mastery'?'active':''}" onclick="switchTab('mastery')">🎯 習熟度</button>`;
+}
+
+function switchTab(name){
+  activeTab=name;
+  const isTask = CATEGORIES.some(c=>c.name===name);
+  document.getElementById('legend-area').style.display = isTask ? 'flex' : 'none';
+  renderTabs();
+  document.querySelectorAll('.category-panel').forEach(p=>p.classList.remove('active'));
+  const mpanel = document.getElementById('mastery-panel');
+  const dpanel = document.getElementById('dashboard-panel');
+  mpanel.classList.remove('active');
+  dpanel.classList.remove('active');
+  if(name==='mastery'){
+    mpanel.classList.add('active');
+    renderMasteryPanel();
+  } else if(name==='dashboard'){
+    dpanel.classList.add('active');
+    renderDashboard();
+  } else {
+    const found=CATEGORIES.find(c=>c.name===name);
+    if(found){const p=document.getElementById('panel-'+found.id); if(p) p.classList.add('active');}
+  }
+}
+
+// ─── Task panels ─────────────────────────────────────────────────────────────
+function renderPanels(){
+  const el=document.getElementById('panels');
+  el.innerHTML = CATEGORIES.map(cat=>{
+    const pct=catProgress(cat.name);
+    const color=CAT_COLORS[cat.name];
+    const parents=PARENTS.filter(p=>p.cat===cat.name);
+    const parentHTML=parents.map(p=>{
+      const kids=CHILDREN.filter(c=>c.pid===p.id);
+      const pp=parentProgress(p.id);
+      const childHTML=kids.map(child=>{
+        const s=getS(child.id);
+        return `
+        <div class="child-row status-${s.status}" id="row-${child.id}">
+          <span class="child-name">${child.name}</span>
+          <span class="child-score">${child.score}点</span>
+          <div class="status-group">
+            ${['未着手','進行中','完了'].map(st=>`<button class="status-btn ${s.status===st?'sel-'+st:''}" onclick="setStatus('${child.id}','${st}')">${st}</button>`).join('')}
+          </div>
+          <input class="field-input" type="text" placeholder="担当者" value="${escHtml(s.assignee)}" onchange="setField('${child.id}','assignee',this.value);refreshMastery()" />
+          <div class="mastery-visual">
+            <div style="display:flex;gap:3px">
+              ${[0,1,2,3,4].map(lv=>`<div class="mastery-dot ${lv <= parseInt(s.mastery) ? 'filled-'+lv : 'filled-0'}"
+                style="${lv<=parseInt(s.mastery)?`background:${MASTERY_FILL[lv]};border-color:${MASTERY_BORDER[lv]}`:''}"
+                onclick="setMastery('${child.id}',${lv})"
+                title="Lv${lv}: ${MASTERY_LABELS[lv]}"></div>`).join('')}
+            </div>
+            <span class="mastery-label" id="mlbl-${child.id}">${MASTERY_LABELS[parseInt(s.mastery)]}</span>
+          </div>
+          <div class="video-cell" id="vcell-${child.id}">${videoCell(child.id, s.videoUrl||'')}</div>
+          <input class="field-input" type="text" placeholder="備考" value="${escHtml(s.note)}" onchange="setField('${child.id}','note',this.value)" />
+        </div>`;
+      }).join('');
+      return `
+      <div class="parent-task" id="ptask-${p.id}">
+        <div class="parent-header" onclick="toggleParent('${p.id}')">
+          <span class="chevron ${openParents.has(p.id)?'open':''}" id="chev-${p.id}">▶</span>
+          <span class="parent-id-badge">${p.id}</span>
+          <span class="parent-timing-badge">${p.timing}</span>
+          <span class="parent-work">${p.work}</span>
+          <div class="parent-right">
+            <div class="parent-mini-bar"><div class="parent-mini-fill" id="pmini-${p.id}" style="width:${pp}%;background:${color}"></div></div>
+            <span class="parent-pct-text" id="ppct-${p.id}">${pp}%</span>
+            <span class="parent-score-text">${p.score}点</span>
+          </div>
+        </div>
+        <div class="child-list ${openParents.has(p.id)?'open':''}" id="clist-${p.id}">
+          <div class="child-col-header">
+            <span class="col-label">作業名</span><span class="col-label">配点</span>
+            <span class="col-label">状態</span><span class="col-label">担当者</span>
+            <span class="col-label">習熟度</span><span class="col-label">マニュアル動画</span><span class="col-label">備考</span>
+          </div>
+          ${childHTML}
+        </div>
+      </div>`;
+    }).join('');
+    const metaLabels = {
+      '入試説明会': { name:'説明会名',  count:'開催回数', date:'開催日',   countUnit:'回目', placeholder:'例：第XX回入試説明会' },
+      'イベント':   { name:'イベント名', count:'開催回数', date:'開催日',   countUnit:'回目', placeholder:'例：第XX回青山XXXXXフォーラム' },
+      '入試':       { name:'入試名',    count:'実施回数', date:'実施日',   countUnit:'回',   placeholder:'例：第XX期' },
+      'メルマガ':   { name:'件名・号',  count:'配信回数', date:'配信予定日', countUnit:'号',  placeholder:'例：青山ビジネススクールメールマガジン　Vol.XXX' },
+    };
+    const ml = metaLabels[cat.name] || { name:'名称', count:'回数', date:'日付', countUnit:'回' };
+    const m = getCatMeta(cat.name);
+    const previewParts = [];
+    if(m.eventName) previewParts.push(`<strong>${escHtml(m.eventName)}</strong>`);
+    if(m.count)     previewParts.push(`第${escHtml(m.count)}${ml.countUnit}`);
+    if(m.date)      previewParts.push(escHtml(m.date));
+
+    return `
+    <div class="category-panel ${cat.name===activeTab?'active':''}" id="panel-${cat.id}">
+      <div class="cat-header">
+        <span class="cat-title">${cat.icon} ${cat.name}</span>
+        <div class="cat-bar"><div class="cat-bar-fill" id="catbar-${cat.id}" style="width:${pct}%;background:${color}"></div></div>
+        <span class="cat-score-text" id="catscore-${cat.id}">${catScoreText(cat.name)}</span>
+      </div>
+
+      <div class="event-meta-card" style="--cat-color:${color}">
+        <div class="event-meta-title">📌 案件情報</div>
+        <div class="event-meta-fields">
+          <div class="event-meta-field">
+            <span class="event-meta-label">${ml.name}</span>
+            <input class="event-meta-input name-input" type="text"
+              placeholder="${ml.placeholder}"
+              value="${escHtml(m.eventName)}"
+              oninput="setCatMeta('${cat.name}','eventName',this.value)" />
+          </div>
+          <div class="event-meta-field">
+            <span class="event-meta-label">${ml.count}</span>
+            <input class="event-meta-input count-input" type="number" min="1"
+              placeholder="1"
+              value="${escHtml(m.count)}"
+              oninput="setCatMeta('${cat.name}','count',this.value)" />
+            <span style="font-size:12px;color:#6b7280">${ml.countUnit}</span>
+          </div>
+          <div class="event-meta-field">
+            <span class="event-meta-label">${ml.date}</span>
+            <input class="event-meta-input event-meta-date-input" type="date"
+              value="${escHtml(m.date)}"
+              oninput="setCatMeta('${cat.name}','date',this.value)" />
+          </div>
+          <span class="event-meta-preview" id="meta-preview-${cat.id}">
+            ${previewParts.length ? previewParts.join('　') : '未入力'}
+          </span>
+          ${undoSnapshots[cat.name] ? `
+          <button class="btn-undo" onclick="undoCarryover('${cat.name}')"
+            title="引き継ぎ前の状態に戻します">
+            ↩ 元に戻す
+          </button>` : ''}
+          <button class="btn-carryover" onclick="startNewEvent('${cat.name}')"
+            title="現在の案件を履歴に保存し、習熟度を引き継いで新しい案件を開始します">
+            📦 次の案件に引き継ぐ
+          </button>
+        </div>
+      </div>
+
+      ${parentHTML}
+
+      ${historyHTML(cat.name, cat.id, color)}
+    </div>`;
+  }).join('');
+}
+
+// ─── Mastery Panel ───────────────────────────────────────────────────────────
+function renderMasteryPanel(){
+  const el=document.getElementById('mastery-panel');
+  if(!el) return;
+
+  // Compute assignees list
+  const assignees=new Set();
+  CHILDREN.forEach(c=>{ const a=getS(c.id).assignee.trim(); if(a) assignees.add(a); });
+  const assigneeList=[...assignees].sort();
+
+  // Distribution across all tasks
+  const distCount=[0,0,0,0,0];
+  const filteredKids = CHILDREN.filter(c=>{
+    if(masteryFilter==='all') return true;
+    if(masteryFilter==='unlearned') return parseInt(getS(c.id).mastery)===0;
+    return getS(c.id).assignee.trim()===masteryFilter;
+  });
+  filteredKids.forEach(c=>{ distCount[parseInt(getS(c.id).mastery)]++; });
+  const maxDist=Math.max(1,...distCount);
+
+  // Per-category average
+  const catOverviewHTML = CATEGORIES.map(cat=>{
+    const kids=CHILDREN.filter(c=>c.cat===cat.name&&(masteryFilter==='all'||masteryFilter==='unlearned'?true:getS(c.id).assignee.trim()===masteryFilter));
+    const levelCounts=[0,0,0,0,0];
+    kids.forEach(c=>levelCounts[parseInt(getS(c.id).mastery)]++);
+    const total=kids.length||1;
+    const avg=(kids.reduce((a,c)=>a+parseInt(getS(c.id).mastery),0)/kids.length)||0;
+    const color=CAT_COLORS[cat.name];
+    return `
+    <div class="mastery-cat-card">
+      <div class="mcc-title">${cat.icon} ${cat.name}</div>
+      <div class="mcc-bar-wrap">
+        ${[0,1,2,3,4].map(lv=>`
+        <div class="mcc-level-row">
+          <span class="mcc-level-label" style="color:${MASTERY_COLORS[lv]}">Lv${lv} ${MASTERY_LABELS[lv].length>5?MASTERY_LABELS[lv].slice(0,5)+'…':MASTERY_LABELS[lv]}</span>
+          <div class="mcc-level-bar"><div class="mcc-level-fill" style="width:${(levelCounts[lv]/total*100).toFixed(0)}%;background:${MASTERY_COLORS[lv]}"></div></div>
+          <span class="mcc-level-count">${levelCounts[lv]}</span>
+        </div>`).join('')}
+      </div>
+      <div class="mcc-avg">平均習熟度: <strong>${avg.toFixed(1)}</strong> / 4.0</div>
+    </div>`;
+  }).join('');
+
+  // Distribution bar chart
+  const distHTML = `
+  <div class="mastery-dist-wrap">
+    <div class="mastery-section-title">📊 習熟度の分布（全${filteredKids.length}タスク）</div>
+    <div class="dist-bars">
+      ${[0,1,2,3,4].map(lv=>`
+      <div class="dist-col">
+        <span class="dist-cnt">${distCount[lv]}</span>
+        <div class="dist-bar" style="height:${Math.round(distCount[lv]/maxDist*60)+4}px;background:${MASTERY_COLORS[lv]}"></div>
+        <span class="dist-lbl"><strong>Lv${lv}</strong></span>
+        <span class="dist-lbl">${['未経験','教わり<br>ながら','手順書<br>を見て','ほぼ<br>自力','人に<br>説明可'][lv]}</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
+
+  // Sorted task table
+  const sorted=[...filteredKids].sort((a,b)=>parseInt(getS(a.id).mastery)-parseInt(getS(b.id).mastery));
+  const tableRows=sorted.map(c=>{
+    const s=getS(c.id);
+    const m=parseInt(s.mastery);
+    const catColor=CAT_COLORS[c.cat];
+    const dotsHTML=[0,1,2,3,4].map(lv=>`<div class="md-sm" style="background:${lv<=m?MASTERY_COLORS[lv]:'#e5e7eb'};border-radius:3px"></div>`).join('');
+    return `<tr>
+      <td>${c.name}</td>
+      <td><span class="cat-tag" style="background:${catColor}22;color:${catColor}">${c.cat}</span></td>
+      <td><span class="m-badge m${m}">${m===0?'⚠ ':m===4?'✓ ':''} Lv${m} ${MASTERY_LABELS[m]}</span></td>
+      <td><div class="mastery-dots-sm">${dotsHTML}</div></td>
+      <td style="color:#6b7280;font-size:12px">${s.assignee||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Filter buttons
+  const filterHTML=`
+  <div class="mastery-filters">
+    <span class="mastery-filter-label">絞り込み：</span>
+    <button class="filter-btn ${masteryFilter==='all'?'active':''}" onclick="setMasteryFilter('all')">全員</button>
+    <button class="filter-btn ${masteryFilter==='unlearned'?'active':''}" onclick="setMasteryFilter('unlearned')">⚠ 未経験のみ</button>
+    ${assigneeList.map(a=>`<button class="filter-btn ${masteryFilter===a?'active':''}" onclick="setMasteryFilter('${escHtml(a)}')">${escHtml(a)}</button>`).join('')}
+  </div>`;
+
+  el.innerHTML = `
+    ${filterHTML}
+    ${distHTML}
+    <div class="mastery-overview">${catOverviewHTML}</div>
+    <div class="mastery-section-title">📋 タスク一覧（習熟度順）</div>
+    <div class="mastery-table-wrap">
+      <table class="mastery-table">
+        <thead><tr>
+          <th>作業名</th><th>カテゴリ</th><th>習熟度</th><th>レベル</th><th>担当者</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+function avgMastery(kids){
+  if(!kids.length) return 0;
+  return kids.reduce((a,c)=>a+parseInt(getS(c.id).mastery),0)/kids.length;
+}
+
+function renderDashboard(){
+  const el=document.getElementById('dashboard-panel');
+  if(!el) return;
+
+  // ── 1. Category summary cards ──
+  const catCardsHTML = CATEGORIES.map(cat=>{
+    const color = CAT_COLORS[cat.name];
+    const kids  = CHILDREN.filter(c=>c.cat===cat.name);
+    const prog  = catProgress(cat.name);
+    const avg   = avgMastery(kids);
+    const avgPct= avg/4*100;
+    // gap: high mastery but low progress → maybe not being practiced; low mastery and low progress → needs attention
+    const gap   = Math.abs(prog - avgPct);
+    const gapLabel = gap >= 40 ? ['gap-high','大きなギャップ'] : gap >= 20 ? ['gap-mid','ギャップあり'] : ['gap-low','バランス良好'];
+    return `
+    <div class="db-cat-card" style="--cat-color:${color}">
+      <div class="db-cat-name">${cat.icon} ${cat.name}</div>
+      <div class="db-metric-row">
+        <div class="db-metric">
+          <div class="db-metric-label">
+            <span class="db-metric-name">📊 作業進捗率</span>
+            <span class="db-metric-value" style="color:${color}">${prog}%</span>
+          </div>
+          <div class="db-bar-track"><div class="db-bar-fill" style="width:${prog}%;background:${color}"></div></div>
+        </div>
+        <div class="db-metric">
+          <div class="db-metric-label">
+            <span class="db-metric-name">🎯 平均習熟度</span>
+            <span class="db-metric-value" style="color:${MASTERY_COLORS[Math.round(avg)]}">${avg.toFixed(1)} / 4.0</span>
+          </div>
+          <div class="db-bar-track"><div class="db-bar-fill" style="width:${avgPct.toFixed(0)}%;background:${MASTERY_COLORS[Math.round(avg)]}"></div></div>
+        </div>
+        <div style="margin-top:4px">
+          <span class="gap-badge ${gapLabel[0]}">${gapLabel[1]}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── 2. Per-task comparison table (all children) ──
+  const rows = CHILDREN.map(c=>{
+    const color  = CAT_COLORS[c.cat];
+    const s      = getS(c.id);
+    const prog   = s.status==='完了'?100:s.status==='進行中'?50:0;
+    const m      = parseInt(s.mastery);
+    const mPct   = m/4*100;
+    const gap    = Math.abs(prog - mPct);
+    const gapCls = gap>=40?'gap-high':gap>=20?'gap-mid':prog===0&&m===0?'gap-none':'gap-low';
+    const gapTxt = gap>=40?'要注意':gap>=20?'差あり':prog===0&&m===0?'—':'良好';
+    return `<tr>
+      <td class="db-task-name">${c.name}</td>
+      <td><span class="db-cat-badge" style="background:${color}22;color:${color}">${c.cat}</span></td>
+      <td>
+        <div class="db-inline-bar">
+          <div class="db-inline-track"><div class="db-inline-fill" style="width:${prog}%;background:${prog===100?'#22c55e':prog===50?'#fbbf24':'#e5e7eb'}"></div></div>
+          <span class="db-inline-val">${prog}%</span>
+        </div>
+      </td>
+      <td>
+        <div class="db-inline-bar">
+          <div class="db-inline-track"><div class="db-inline-fill" style="width:${mPct}%;background:${MASTERY_COLORS[m]}"></div></div>
+          <span class="db-inline-val" style="color:${MASTERY_COLORS[m]}">${m}</span>
+        </div>
+      </td>
+      <td><span class="gap-badge ${gapCls}">${gapTxt}</span></td>
+      <td style="font-size:12px;color:#6b7280">${s.assignee||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="db-section-title">📋 カテゴリ別サマリー</div>
+    <div class="db-cat-grid">${catCardsHTML}</div>
+
+    <div class="db-section-title" style="margin-top:24px">🔍 タスク別 比較（進捗率 vs 習熟度）</div>
+    <div class="db-compare-wrap">
+      <table class="db-compare-table">
+        <thead><tr>
+          <th>タスク名</th><th>カテゴリ</th>
+          <th>📊 進捗率</th><th>🎯 習熟度</th>
+          <th>ギャップ</th><th>担当者</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ─── Carry-over ──────────────────────────────────────────────────────────────
+function startNewEvent(catName){
+  const m = getCatMeta(catName);
+  const kids = CHILDREN.filter(c => c.cat === catName);
+
+  // 案件情報が未入力の場合は警告
+  if(!m.eventName && !m.count && !m.date){
+    if(!confirm('案件情報（名称・回数）が未入力ですが、このまま引き継ぎますか？')) return;
+  }
+
+  // ── 引き継ぎ前のスナップショットを保存（元に戻す用）──
+  const prevTaskSnap = {};
+  kids.forEach(c=>{ prevTaskSnap[c.id] = { ...getS(c.id) }; });
+  // このスナップショットは次回の引き継ぎorページ離脱まで有効
+  // （後で undoCarryover から参照）
+
+  // 現在の進捗率・習熟度平均を計算してアーカイブ
+  const total = kids.reduce((a,c)=>a+c.score,0);
+  const done  = kids.reduce((a,c)=>a+reflectedPts(c.id,c.score),0);
+  const completionRate = total>0 ? Math.round(done/total*100) : 0;
+  const avgMastery = kids.length ? (kids.reduce((a,c)=>a+parseInt(getS(c.id).mastery),0)/kids.length).toFixed(1) : 0;
+
+  const taskSnap = {};
+  kids.forEach(c=>{
+    const s = getS(c.id);
+    taskSnap[c.id] = { status:s.status, assignee:s.assignee, note:s.note, videoUrl:s.videoUrl||'' };
+  });
+
+  const record = {
+    id: Date.now(),
+    meta: { ...m },
+    completionRate,
+    avgMastery,
+    archivedAt: new Date().toLocaleDateString('ja-JP'),
+    tasks: taskSnap
+  };
+  if(!catHistory[catName]) catHistory[catName] = [];
+  catHistory[catName].unshift(record);
+  saveCatHistory();
+
+  // 進捗・担当者・備考をリセット（習熟度・動画URLは引き継ぎ）
+  kids.forEach(c=>{
+    const s = getS(c.id);
+    state[c.id] = { status:'未着手', assignee:'', note:'', videoUrl:s.videoUrl||'', mastery:s.mastery };
+  });
+  saveState();
+
+  // 案件情報をクリア
+  catMeta[catName] = { eventName:'', count:'', date:'' };
+  db.ref('/marketo/catMeta').set(catMeta||{});
+
+  // 元に戻す用スナップショットを記録
+  undoSnapshots[catName] = { tasks: prevTaskSnap, meta: { ...m }, historyId: record.id };
+
+  // 再描画
+  render();
+}
+
+function undoCarryover(catName){
+  const snap = undoSnapshots[catName];
+  if(!snap) return;
+  if(!confirm('引き継ぎを元に戻しますか？\n現在の入力内容は失われ、引き継ぎ前の状態に戻ります。')){return;}
+
+  // タスク状態を復元
+  const kids = CHILDREN.filter(c => c.cat === catName);
+  kids.forEach(c=>{
+    if(snap.tasks[c.id]) state[c.id] = { ...snap.tasks[c.id] };
+  });
+  saveState();
+
+  // 案件情報を復元
+  catMeta[catName] = { ...snap.meta };
+  db.ref('/marketo/catMeta').set(catMeta||{});
+
+  // 引き継ぎ操作の場合は履歴から削除
+  if(snap.historyId !== null && catHistory[catName]){
+    catHistory[catName] = catHistory[catName].filter(r => r.id !== snap.historyId);
+    saveCatHistory();
+  }
+  // 復元操作の取り消しの場合は、履歴に戻す
+  if(snap.restoredRecord){
+    if(!catHistory[catName]) catHistory[catName] = [];
+    catHistory[catName].unshift(snap.restoredRecord);
+    saveCatHistory();
+  }
+
+  // スナップショットを破棄
+  delete undoSnapshots[catName];
+
+  render();
+}
+
+function restoreFromHistory(catName, historyId){
+  const records = catHistory[catName] || [];
+  const record = records.find(r => r.id === historyId);
+  if(!record) return;
+
+  const name = record.meta.eventName || catName;
+  const label = record.meta.count ? `第${record.meta.count}回 ` : '';
+  if(!confirm(`「${label+name}」を現在の案件として復元しますか？\n\n現在の進捗・担当者・備考は上書きされます。\n習熟度は現在の値を引き続き使用します。`)) return;
+
+  // 現在の状態を一時保存（元に戻せるよう）
+  const kids = CHILDREN.filter(c => c.cat === catName);
+  const prevTaskSnap = {};
+  kids.forEach(c => { prevTaskSnap[c.id] = { ...getS(c.id) }; });
+
+  // 履歴のタスク状態を復元（習熟度は現在値を維持）
+  kids.forEach(c => {
+    const cur  = getS(c.id);
+    const hist = record.tasks[c.id] || {};
+    state[c.id] = {
+      status:   hist.status   || '未着手',
+      assignee: hist.assignee || '',
+      note:     hist.note     || '',
+      videoUrl: hist.videoUrl || cur.videoUrl || '',
+      mastery:  cur.mastery   // 現在の習熟度を維持
+    };
+  });
+  saveState();
+
+  // 案件情報を復元
+  catMeta[catName] = { ...record.meta };
+  db.ref('/marketo/catMeta').set(catMeta||{});
+
+  // 履歴から該当レコードを削除（現在の案件になったので過去履歴から外す）
+  if(catHistory[catName]){
+    catHistory[catName] = catHistory[catName].filter(r => r.id !== historyId);
+    saveCatHistory();
+  }
+
+  // 元に戻せるよう undoSnapshots に保存（復元したレコードIDも記録して取り消し時に戻せる）
+  undoSnapshots[catName] = {
+    tasks: prevTaskSnap,
+    meta: getCatMeta(catName),
+    historyId: null,         // 取り消し時は履歴に戻さない（引き継ぎ操作との違い）
+    restoredRecord: record   // 取り消し時に履歴に戻すために保持
+  };
+
+  render();
+}
+
+function toggleHistory(catId){
+  const list = document.getElementById('hlist-'+catId);
+  const chev = document.getElementById('hchev-'+catId);
+  if(!list) return;
+  const open = list.classList.toggle('open');
+  if(chev) chev.classList.toggle('open', open);
+}
+
+function historyHTML(catName, catId, color){
+  const records = (catHistory[catName]||[]);
+  const itemsHTML = records.length === 0
+    ? `<div class="history-empty">まだ履歴はありません</div>`
+    : records.map(r=>{
+        const name = r.meta.eventName || catName;
+        const label = r.meta.count ? `第${r.meta.count}回　` : '';
+        const dateLabel = r.meta.date || r.archivedAt;
+        const rateColor = r.completionRate>=80?'#22c55e':r.completionRate>=40?'#fbbf24':'#f87171';
+        return `<div class="history-item">
+          <span class="history-event-name">${escHtml(label+name)}</span>
+          <span class="history-date">📅 ${escHtml(dateLabel)}　保存: ${escHtml(r.archivedAt)}</span>
+          <div class="history-rate-wrap">
+            <span style="font-size:11px;color:#9ca3af">完了率</span>
+            <div class="history-rate-bar"><div class="history-rate-fill" style="width:${r.completionRate}%;background:${rateColor}"></div></div>
+            <span class="history-rate-val" style="color:${rateColor}">${r.completionRate}%</span>
+          </div>
+          <span class="history-mastery-avg">🎯 習熟度 ${r.avgMastery}/4.0</span>
+          <button class="btn-restore" onclick="restoreFromHistory('${catName}',${r.id})">📂 この案件を復元</button>
+        </div>`;
+      }).join('');
+
+  return `<div class="history-section">
+    <button class="history-toggle" onclick="toggleHistory('${catId}')">
+      <span class="h-chevron" id="hchev-${catId}">▶</span>
+      📋 過去の案件履歴
+      <span style="font-size:11px;background:#f3f4f6;padding:1px 7px;border-radius:99px;color:#6b7280">${records.length}件</span>
+    </button>
+    <div class="history-list" id="hlist-${catId}">${itemsHTML}</div>
+  </div>`;
+}
+
+// ─── Video URL helpers ───────────────────────────────────────────────────────
+function videoCell(id, url){
+  const u = (url||'').trim();
+  const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}')" onkeydown="if(event.key==='Enter'){this.blur()}" />`;
+  if(u){
+    return `<a href="${escHtml(u)}" target="_blank" rel="noopener" class="video-play-btn">▶ 再生</a>
+            <button class="video-edit-btn" onclick="toggleVideoEdit('${id}')">✏️ URL変更</button>
+            ${inputHTML}`;
+  } else {
+    return `<button class="video-add-btn" onclick="toggleVideoEdit('${id}')">🎬 URLを追加</button>
+            ${inputHTML}`;
+  }
+}
+
+function toggleVideoEdit(id){
+  const input = document.getElementById('vinput-'+id);
+  if(!input) return;
+  const visible = input.style.display !== 'none';
+  input.style.display = visible ? 'none' : 'block';
+  if(!visible){ input.focus(); input.select(); }
+}
+
+function saveVideoUrl(id){
+  const input = document.getElementById('vinput-'+id);
+  if(!input) return;
+  const url = input.value.trim();
+  setField(id,'videoUrl',url);
+  const cell = document.getElementById('vcell-'+id);
+  if(cell) cell.innerHTML = videoCell(id, url);
+}
+
+// ─── Interactions ─────────────────────────────────────────────────────────────
+function toggleParent(pid){
+  const list=document.getElementById('clist-'+pid);
+  const chev=document.getElementById('chev-'+pid);
+  if(!list) return;
+  const isOpen=list.classList.toggle('open');
+  if(chev) chev.classList.toggle('open',isOpen);
+  if(isOpen) openParents.add(pid); else openParents.delete(pid);
+}
+
+function setStatus(id,status){
+  setField(id,'status',status);
+  const row=document.getElementById('row-'+id);
+  if(row){
+    row.className='child-row status-'+status;
+    row.querySelectorAll('.status-btn').forEach(btn=>{
+      const s=btn.textContent.trim();
+      btn.className='status-btn'+(s===status?' sel-'+s:'');
+    });
+  }
+  updateProgress();
+}
+
+function setMastery(id, level){
+  setField(id,'mastery',level);
+  const row=document.getElementById('row-'+id);
+  if(row){
+    row.querySelectorAll('.mastery-dot').forEach((dot,i)=>{
+      if(i<=level){
+        dot.className='mastery-dot filled-'+i;
+        dot.style.background=MASTERY_FILL[i];
+        dot.style.borderColor=MASTERY_BORDER[i];
+      } else {
+        dot.className='mastery-dot filled-0';
+        dot.style.background='';
+        dot.style.borderColor='';
+      }
+    });
+    const lbl=document.getElementById('mlbl-'+id);
+    if(lbl) lbl.textContent=MASTERY_LABELS[level];
+  }
+  refreshMastery();
+}
+
+function refreshMastery(){
+  if(activeTab==='mastery') renderMasteryPanel();
+  if(activeTab==='dashboard') renderDashboard();
+}
+
+function setMasteryFilter(f){
+  masteryFilter=f;
+  renderMasteryPanel();
+}
+
+function updateProgress(){
+  const op=overallProgress();
+  document.getElementById('overall-bar').style.width=op+'%';
+  const opEl=document.getElementById('overall-pct');
+  opEl.textContent=op+'%';
+  opEl.style.color=op>=80?'#16a34a':op>=40?'#d97706':'#6b7280';
+  CATEGORIES.forEach(cat=>{
+    const pct=catProgress(cat.name);
+    const color=CAT_COLORS[cat.name];
+    const tp=document.getElementById('tab-pct-'+cat.id); if(tp) tp.textContent=pct+'%';
+    const b=document.getElementById('catbar-'+cat.id); if(b){b.style.width=pct+'%';b.style.background=color;}
+    const sc=document.getElementById('catscore-'+cat.id); if(sc) sc.textContent=catScoreText(cat.name);
+    PARENTS.filter(p=>p.cat===cat.name).forEach(p=>{
+      const pp=parentProgress(p.id);
+      const m=document.getElementById('pmini-'+p.id); if(m){m.style.width=pp+'%';m.style.background=color;}
+      const pt=document.getElementById('ppct-'+p.id); if(pt) pt.textContent=pp+'%';
+    });
+  });
+  if(activeTab==='dashboard') renderDashboard();
+}
+
+function catScoreText(cn){
+  const k=CHILDREN.filter(c=>c.cat===cn);
+  const t=k.reduce((a,c)=>a+c.score,0);
+  const d=k.reduce((a,c)=>a+reflectedPts(c.id,c.score),0);
+  return `${d} / ${t} 点`;
+}
+
+function confirmReset(){
+  if(confirm('すべての進捗・担当者・習熟度・備考・案件情報をリセットしますよ？\nこの操作は元に戻せません。')){
+    state={};
+    catMeta={};
+    catHistory={};
+    db.ref('/marketo').set({ state:{}, catMeta:{}, catHistory:{} });
+    render();
+  }
+}
+
+function escHtml(str){
+  return String(str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Firebase リアルタイム同期 ────────────────────────────────────────────────
+db.ref('/marketo').on('value', snapshot => {
+  const data = snapshot.val() || {};
+  state      = data.state      || {};
+  catMeta    = data.catMeta    || {};
+  catHistory = data.catHistory || {};
+  render();
+});
+</script>
+</body>
+</html>
