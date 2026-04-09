@@ -561,11 +561,15 @@ const undoSnapshots = {}; // { catName: { tasks, meta, historyId } }
 function getCatMeta(catName){
   return catMeta[catName] || { eventName:'', count:'', date:'' };
 }
+let _catMetaTimer = null;
 function setCatMeta(catName, field, value){
   if(!catMeta[catName]) catMeta[catName] = { eventName:'', count:'', date:'' };
   catMeta[catName][field] = value;
-  db.ref('/marketo/catMeta').set(catMeta||{});
-  updateMetaPreview(catName);
+  updateMetaPreview(catName); // プレビューは即時更新
+  clearTimeout(_catMetaTimer);
+  _catMetaTimer = setTimeout(() => {
+    db.ref('/marketo/catMeta').set(catMeta||{}); // Firebase書き込みは800ms後
+  }, 800);
 }
 function updateMetaPreview(catName){
   const m = getCatMeta(catName);
@@ -719,14 +723,14 @@ function renderPanels(){
         <div class="event-meta-fields">
           <div class="event-meta-field">
             <span class="event-meta-label">${ml.name}</span>
-            <input class="event-meta-input name-input" type="text"
+            <input id="meta-name-${cat.id}" class="event-meta-input name-input" type="text"
               placeholder="${ml.placeholder}"
               value="${escHtml(m.eventName)}"
               oninput="setCatMeta('${cat.name}','eventName',this.value)" />
           </div>
           <div class="event-meta-field">
             <span class="event-meta-label">${ml.count}</span>
-            <input class="event-meta-input count-input" type="number" min="1"
+            <input id="meta-count-${cat.id}" class="event-meta-input count-input" type="number" min="1"
               placeholder="1"
               value="${escHtml(m.count)}"
               oninput="setCatMeta('${cat.name}','count',this.value)" />
@@ -734,7 +738,7 @@ function renderPanels(){
           </div>
           <div class="event-meta-field">
             <span class="event-meta-label">${ml.date}</span>
-            <input class="event-meta-input event-meta-date-input" type="date"
+            <input id="meta-date-${cat.id}" class="event-meta-input event-meta-date-input" type="date"
               value="${escHtml(m.date)}"
               oninput="setCatMeta('${cat.name}','date',this.value)" />
           </div>
@@ -1134,7 +1138,8 @@ function historyHTML(catName, catId, color){
 // ─── Video URL helpers ───────────────────────────────────────────────────────
 function videoCell(id, url){
   const u = (url||'').trim();
-  const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}')" onkeydown="if(event.key==='Enter'){this.blur()}" />`;
+  // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するため）
+  const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}', this.value)" onkeydown="if(event.key==='Enter'){saveVideoUrl('${id}', this.value); this.blur();}" />`;
   if(u){
     return `<a href="${escHtml(u)}" target="_blank" rel="noopener" class="video-play-btn">▶ 再生</a>
             <button class="video-edit-btn" onclick="toggleVideoEdit('${id}')">✏️ URL変更</button>
@@ -1153,10 +1158,10 @@ function toggleVideoEdit(id){
   if(!visible){ input.focus(); input.select(); }
 }
 
-function saveVideoUrl(id){
-  const input = document.getElementById('vinput-'+id);
-  if(!input) return;
-  const url = input.value.trim();
+function saveVideoUrl(id, value){
+  // valueは onblur/Enter時の this.value（DOM再生成があっても正しい値を保持）
+  const url = (value !== undefined ? value : (document.getElementById('vinput-'+id)||{}).value || '').trim();
+  if(url === getS(id).videoUrl) return; // 変化なければスキップ
   setField(id,'videoUrl',url);
   const cell = document.getElementById('vcell-'+id);
   if(cell) cell.innerHTML = videoCell(id, url);
@@ -1264,7 +1269,25 @@ db.ref('/marketo').on('value', snapshot => {
   state      = data.state      || {};
   catMeta    = data.catMeta    || {};
   catHistory = data.catHistory || {};
+
+  // render()前に現在フォーカス中の要素のIDとカーソル位置を保存
+  const focused = document.activeElement;
+  const focusedId   = focused && focused.id ? focused.id : null;
+  const selStart    = focused ? focused.selectionStart : null;
+  const selEnd      = focused ? focused.selectionEnd   : null;
+
   render();
+
+  // render()後にフォーカスを復元（入力中の要素が再生成されてもカーソル位置を保持）
+  if(focusedId){
+    const el = document.getElementById(focusedId);
+    if(el){
+      el.focus();
+      if(selStart !== null && el.setSelectionRange){
+        try { el.setSelectionRange(selStart, selEnd); } catch(e){}
+      }
+    }
+  }
 });
 </script>
 </body>
