@@ -455,7 +455,7 @@
 </main>
 
 <footer style="text-align:center;padding:24px 16px 32px;font-size:13px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:32px;background:#fff;">
-  ログイン方法が不明な場合は担当責任者（谷口）までご連絡ください
+  ログイン方法が不明な場合は担当責Ļ�者（谷口）までご連絡ください
 </footer>
 
 <script>
@@ -463,7 +463,7 @@
 const CATEGORIES = [
   { id:'A', name:'入試説明会', icon:'📝' },
   { id:'B', name:'イベント',   icon:'🎪' },
-  { id:'C', name:'入試',       icon:'📚' },
+  { id:'C', name:'入試'.       icon:'📚' },
   { id:'D', name:'メルマガ',   icon:'📧' },
 ];
 const CAT_COLORS = { '入試説明会':'#3b82f6','イベント':'#8b5cf6','入試':'#f59e0b','メルマガ':'#10b981' };
@@ -961,13 +961,13 @@ function startNewEvent(catName){
 
   // 案件情報が未入力の場合は警告
   if(!m.eventName && !m.count && !m.date){
-    if(!confirm('案件情報（名称・回数）が未入力ですが、このまま引き継ぎますか？')) return;
+    if(!confirm('案件情報（名称・回数）が未入力ですが、このまま引き継ぎますお���')) return;
   }
 
   // ── 引き継ぎ前のスナップショットを保存（元に戻す用）──
   const prevTaskSnap = {};
   kids.forEach(c=>{ prevTaskSnap[c.id] = { ...getS(c.id) }; });
-  // このスナップショットは次回の引き継ぎorページ離脱まで有効
+  // このスナッミショットは次回の引き継ぎorページ離脱まで有効
   // （後で undoCarryover から参照）
 
   // 現在の進捗率・習熟度平均を計算してアーカイブ
@@ -1138,7 +1138,7 @@ function historyHTML(catName, catId, color){
 // ─── Video URL helpers ───────────────────────────────────────────────────────
 function videoCell(id, url){
   const u = (url||'').trim();
-  // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するため）
+  // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するた、）
   const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}', this.value)" onkeydown="if(event.key==='Enter'){saveVideoUrl('${id}', this.value); this.blur();}" />`;
   if(u){
     return `<a href="${escHtml(u)}" target="_blank" rel="noopener" class="video-play-btn">▶ 再生</a>
