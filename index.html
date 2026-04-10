@@ -455,7 +455,7 @@
 </main>
 
 <footer style="text-align:center;padding:24px 16px 32px;font-size:13px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:32px;background:#fff;">
-  ログイン方法が不明な場合は担当責Ļ�者（谷口）までご連絡ください
+  ログイン方法が不明な場合は担当責任者（谷口）までご連絡ください
 </footer>
 
 <script>
@@ -463,7 +463,7 @@
 const CATEGORIES = [
   { id:'A', name:'入試説明会', icon:'📝' },
   { id:'B', name:'イベント',   icon:'🎪' },
-  { id:'C', name:'入試'.       icon:'📚' },
+  { id:'C', name:'入試',       icon:'📚' },
   { id:'D', name:'メルマガ',   icon:'📧' },
 ];
 const CAT_COLORS = { '入試説明会':'#3b82f6','イベント':'#8b5cf6','入試':'#f59e0b','メルマガ':'#10b981' };
@@ -501,39 +501,39 @@ const CHILDREN = [
   {id:'A-02-3',pid:'A-02',cat:'入試説明会',timing:'2〜3週間前',name:'リマインドメール原稿確認依頼',score:6},
   {id:'A-03-1',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'差込文書確認依頼',score:3},
   {id:'A-03-2',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'リマインドメール流し込み',score:6},
-  {id:'A-03-3',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'事後アンケート設定・流し込み',score:6},
-  {id:'A-03-4',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'返信確認・関係者フォロー',score:3},
-  {id:'A-04-1',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'リマインドメール配信',score:4},
-  {id:'A-04-2',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'自動返信差し替え',score:4},
-  {id:'A-04-3',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'事前アンケート送付・参加者名簿送付',score:4},
-  {id:'A-05-1',pid:'A-05',cat:'入試説明会',timing:'当日',name:'当日対応・事前アンケート集計',score:2},
+  {ld:'A-03-3',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'事後アンケート設定・流し込み',score:6},
+  {ld:'A-03-4',pid:'A-03',cat:'入試説明会',timing:'1〜2週間前',name:'返信確認・関係者フォロー',score:3},
+  {ld:'A-04-1',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'リマインドメール配信',score:4},
+  {ld:'A-04-2',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'自動返信差し替え',score:4},
+  {ld:'A-04-3',pid:'A-04',cat:'入試説明会',timing:'3〜1日前',name:'事前アンケート送付・参加者名簿送付',score:4},
+  {ld:'A-05-1',pid:'A-05',cat:'入試説明会',timing:'当日',name:'当日対応・事前アンケート集計',score:2},
   {id:'A-05-2',pid:'A-05',cat:'入試説明会',timing:'開催後1〜3日',name:'事後アンケート送付・配信報告',score:3},
   {id:'A-05-3',pid:'A-05',cat:'入試説明会',timing:'開催後1〜4週間',name:'事前事後アンケート集計',score:3},
   {id:'A-05-4',pid:'A-05',cat:'入試説明会',timing:'開催後1〜4週間',name:'顧客管理表更新・DB作成・重複削除・提出報告',score:9},
-  {id:'B-01-1',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム作成',score:15},
-  {id:'B-01-2',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'自動返信メール更新',score:10},
-  {id:'B-01-3',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム動作確認',score:10},
-  {id:'B-02-1',pid:'B-02',cat:'イベント',timing:'開催前数週間',name:'申込者状況・人数報告',score:20},
+  {ld:'B-01-1',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム作成',score:15},
+  {ld:'B-01-2',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'自動返信メール更新',score:10},
+  {ld:'B-01-3',pid:'B-01',cat:'イベント',timing:'1か月以上前',name:'フォーム動作確認',score:10},
+  {ld:'B-02-1',pid:'B-02',cat:'イベント',timing:'開催前数週間',name:'申込者状況・人数報告',score:20},
   {id:'B-02-2',pid:'B-02',cat:'イベント',timing:'開催前数週間',name:'申込者リスト共有・提出',score:15},
   {id:'B-03-1',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'自動返信メール差し替え',score:8},
-  {id:'B-03-2',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'リマインドメール流し込み',score:8},
+  {ld:'B-03-2',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'リマインドメール流し込み',score:8},
   {id:'B-03-3',pid:'B-03',cat:'イベント',timing:'1週間前後',name:'開催前日：リマインドメール配信・報告',score:3},
   {id:'B-04-3',pid:'B-04',cat:'イベント',timing:'当日',name:'開催当日：最新申込者数報告・申込者リスト提出',score:6},
   {id:'B-04-4',pid:'B-04',cat:'イベント',timing:'開催後',name:'開催翌日：フォーム閉鎖・募集終了対応',score:5},
-  {id:'C-01-1',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'出願者情報Excel作成',score:20},
-  {id:'C-01-2',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'紙資料・PDF受領',score:10},
+  {ld:'C-01-1',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'出願者情報Excel作成',score:20},
+  {ld:'C-01-2',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'紙資料・PDF受領',score:10},
   {id:'C-01-3',pid:'C-01',cat:'入試',timing:'2〜3週間前',name:'受領状況確認',score:10},
   {id:'C-02-1',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'メールアドレス転記',score:20},
-  {id:'C-02-2',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'返却用整理',score:10},
+  {ld:'C-02-2',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'返却用整理',score:10},
   {id:'C-02-3',pid:'C-02',cat:'入試',timing:'1〜2週間前',name:'マルケトと最新情報の照合',score:20},
   {id:'C-03-1',pid:'C-03',cat:'入試',timing:'1週間前後',name:'リマインドメール確認依頼',score:5},
   {id:'C-03-2',pid:'C-03',cat:'入試',timing:'1週間前後',name:'募集開始リマインド配信設定・報告',score:5},
-  {id:'D-01-3',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿作成',score:35},
-  {id:'D-01-4',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿確認ご依頼',score:30},
-  {id:'D-02-1',pid:'D-02',cat:'メルマガ',timing:'前日',name:'マルケト流し込み',score:25},
+  {ld:'D-01-3',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿作成',score:35},
+  {ld:'D-01-4',pid:'D-01',cat:'メルマガ',timing:'1週間前まで',name:'原稿確認ご依頼',score:30},
+  {ld:'D-02-1',pid:'D-02',cat:'メルマガ',timing:'前日',name:'マルケト流し込み',score:25},
   {id:'D-02-2',pid:'D-02',cat:'メルマガ',timing:'前日',name:'配信設定',score:15},
   {id:'D-03-1',pid:'D-03',cat:'メルマガ',timing:'当日',name:'配信',score:10},
-  {id:'D-03-2',pid:'D-03',cat:'メルマガ',timing:'当日',name:'配信報告',score:5},
+  {ld:'D-03-2',pid:'D-03',cat:'メルマガ',timing:'当日',name:'配信報告',score:5},
 ];
 
 // ─── Firebase 初期化 ──────────────────────────────────────────────────────────
@@ -855,7 +855,7 @@ function renderMasteryPanel(){
     <div class="mastery-table-wrap">
       <table class="mastery-table">
         <thead><tr>
-          <th>作業名</th><th>カテゴリ</th><th>習熟度</th><th>レベル</th><th>担当者</th>
+          <th>作業名</th><th>カヅゴリ</th><th>習熟度</th><th>レベル</th><th>担当者</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -961,13 +961,13 @@ function startNewEvent(catName){
 
   // 案件情報が未入力の場合は警告
   if(!m.eventName && !m.count && !m.date){
-    if(!confirm('案件情報（名称・回数）が未入力ですが、このまま引き継ぎますお���')) return;
+    if(!confirm('案件情報（名称・回数）が未入力ですが、このまま引き継ぎますか？')) return;
   }
 
   // ── 引き継ぎ前のスナップショットを保存（元に戻す用）──
   const prevTaskSnap = {};
   kids.forEach(c=>{ prevTaskSnap[c.id] = { ...getS(c.id) }; });
-  // このスナッミショットは次回の引き継ぎorページ離脱まで有効
+  // このスナップショットは次回の引き継ぎorページ離脱まで有効
   // （後で undoCarryover から参照）
 
   // 現在の進捗率・習熟度平均を計算してアーカイブ
@@ -1138,7 +1138,7 @@ function historyHTML(catName, catId, color){
 // ─── Video URL helpers ───────────────────────────────────────────────────────
 function videoCell(id, url){
   const u = (url||'').trim();
-  // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するた、）
+  // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するため）
   const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}', this.value)" onkeydown="if(event.key==='Enter'){saveVideoUrl('${id}', this.value); this.blur();}" />`;
   if(u){
     return `<a href="${escHtml(u)}" target="_blank" rel="noopener" class="video-play-btn">▶ 再生</a>
@@ -1159,7 +1159,7 @@ function toggleVideoEdit(id){
 }
 
 function saveVideoUrl(id, value){
-  // valueは onblur/Enter時の this.value（DOM再生成があっても正しい値を保持）
+  // valueは onblur/Enter時の this.value（DOM再生成があって゚���しい値を保持）
   const url = (value !== undefined ? value : (document.getElementById('vinput-'+id)||{}).value || '').trim();
   if(url === getS(id).videoUrl) return; // 変化なければスキップ
   setField(id,'videoUrl',url);
