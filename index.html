@@ -420,7 +420,14 @@
     .gap-mid    { background: #fed7aa; color: #ea580c; }
     .gap-low    { background: #bbf7d0; color: #16a34a; }
     .gap-none   { background: #f3f4f6; color: #9ca3af; }
-  </style>
+  .btn-hist-detail{background:#f0f4ff;color:#4a6cf7;border:1px solid #c5d0fa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;margin-left:8px}
+    .btn-hist-detail:hover{background:#e0e8ff}
+    .hist-detail-table{width:100%;border-collapse:collapse;font-size:13px}
+    .hist-detail-table th{background:#f5f7fa;padding:8px 10px;text-align:left;font-weight:600;border-bottom:2px solid #e0e0e0}
+    .hist-detail-table td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top}
+    .hist-detail-table tr:hover td{background:#f9f9f9}
+    #histDetailModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center}
+    </style>
 </head>
 <body>
 
@@ -1127,6 +1134,7 @@ function historyHTML(catName, catId, color){
           </div>
           <span class="history-mastery-avg">🎯 習熟度 ${r.avgMastery}/4.0</span>
           <button class="btn-restore" onclick="restoreFromHistory('${catName}',${r.id})">📂 この案件を復元</button>
+          <button class="btn-hist-detail" onclick="showHistoryDetail('${catName}',${r.id})">📋 タスク詳細</button>
         </div>`;
       }).join('');
 
@@ -1141,7 +1149,46 @@ function historyHTML(catName, catId, color){
 }
 
 // ─── Video URL helpers ───────────────────────────────────────────────────────
-function videoCell(id, url){
+
+  function showHistoryDetail(catName, historyId){
+    const records = catHistory[catName] || [];
+    const r = records.find(x => x.id === historyId);
+    if(!r) return;
+    const tasks = r.tasks || {};
+    const cats = [...new Set(CHILDREN.filter(c => tasks[c.id]).map(c => c.pid))];
+    const parents = PARENTS ? PARENTS.filter(p => cats.includes(p.id)) : [];
+    const statusLabel = {'未着手':'⚪ 未着手','進行中':'🟡 進行中','完了':'🟢 完了'};
+    const masteryLabel = ['未経験','見ながらできる','手順書を見て','ほぼ自力','完全自力'];
+    let html = '';
+    // Group by parent
+    const grouped = {};
+    CHILDREN.filter(c => tasks[c.id]).forEach(c => {
+      if(!grouped[c.pid]) grouped[c.pid] = [];
+      grouped[c.pid].push(c);
+    });
+    Object.entries(grouped).forEach(([pid, children]) => {
+      html += '<div style="margin-bottom:18px"><div style="font-weight:700;font-size:13px;color:#555;padding:6px 0;border-bottom:2px solid #e8eaf0;margin-bottom:6px">' + pid + '</div>';
+      html += '<table class="hist-detail-table"><thead><tr><th>タスク名</th><th>状態</th><th>担当者</th><th>習熟度</th><th>備考</th></tr></thead><tbody>';
+      children.forEach(c => {
+        const t = tasks[c.id] || {};
+        const st = t.status || '未着手';
+        const asgn = t.assignee || '-';
+        const mast = t.mastery != null ? masteryLabel[t.mastery] || t.mastery : '-';
+        const nt = t.note || '';
+        html += '<tr><td>' + c.name + '</td><td>' + (statusLabel[st]||st) + '</td><td>' + asgn + '</td><td>' + mast + '</td><td style="color:#666">' + nt + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    });
+    const title = (r.meta.eventName||'') + '（' + (r.meta.date||'') + '）保存日: ' + (r.archivedAt||'');
+    document.getElementById('histDetailTitle').textContent = title;
+    document.getElementById('histDetailBody').innerHTML = html;
+    document.getElementById('histDetailModal').style.display = 'flex';
+  }
+  function closeHistoryDetail(){
+    document.getElementById('histDetailModal').style.display = 'none';
+  }
+
+  function videoCell(id, url){
   const u = (url||'').trim();
   // onblur時に this.value を引数で渡す（render()によるDOM再生成後でも値を保持するため）
   const inputHTML = `<input class="video-url-input" id="vinput-${id}" type="url" placeholder="https://..." value="${escHtml(u)}" style="display:none" onblur="saveVideoUrl('${id}', this.value)" onkeydown="if(event.key==='Enter'){saveVideoUrl('${id}', this.value); this.blur();}" />`;
@@ -1295,5 +1342,14 @@ db.ref('/marketo').on('value', snapshot => {
   }
 });
 </script>
+<div id="histDetailModal">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:920px;width:92%;max-height:86vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 id="histDetailTitle" style="font-size:15px;font-weight:700;color:#333"></h3>
+      <button onclick="closeHistoryDetail()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1">✕</button>
+    </div>
+    <div id="histDetailBody"></div>
+  </div>
+</div>
 </body>
 </html>
