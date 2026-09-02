@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マルケト年間スケジュール</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+    background: #f5f6f8;
+    color: #1f2937;
+    line-height: 1.5;
+    padding: 20px 14px 40px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  /* ─── Header ─── */
+  .page-header {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .page-title { flex: 1; min-width: 220px; }
+  .page-title h1 {
+    font-size: 19px; font-weight: 700; color: #0f2c4b; margin-bottom: 3px;
+  }
+  .page-title .subtitle {
+    font-size: 12px; color: #6b7280;
+  }
+  .overall-stats {
+    display: flex; align-items: center; gap: 14px;
+    background: #f9fafb; padding: 10px 16px; border-radius: 10px;
+    min-width: 280px;
+  }
+  .overall-label { font-size: 11px; color: #6b7280; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .overall-bar-wrap { flex: 1; height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; min-width: 100px; }
+  .overall-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg,#22c55e,#16a34a); transition: width .4s ease; }
+  .overall-pct { font-size: 16px; font-weight: 700; color: #16a34a; min-width: 44px; text-align: right; }
+  .overall-score { font-size: 11px; color: #6b7280; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; }
+  .sync-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; padding: 5px 11px;
+    border-radius: 99px; background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #6b7280;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .sync-status.synced { background: #f0fdf4; border-color: #86efac; color: #16a34a; }
+  .sync-status.saving { background: #eff6ff; border-color: #93c5fd; color: #2563eb; }
+  .sync-status.offline { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+  .sync-status.connecting { background: #fefce8; border-color: #fde047; color: #a16207; }
+  .sync-status .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .sync-status.synced .dot { animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .btn {
+    background: #fff; border: 1px solid #d1d5db; color: #4b5563;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    font-family: inherit; font-weight: 600; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn:hover { background: #f3f4f6; border-color: #9ca3af; color: #111827; }
+  .btn-primary {
+    background: #3b82f6; border-color: #3b82f6; color: #fff;
+  }
+  .btn-primary:hover { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .btn-danger:hover { background: #fef2f2; border-color: #f87171; color: #dc2626; }
+
+  /* ─── Tabs ─── */
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab {
+    padding: 8px 16px; border-radius: 99px; border: 2px solid #e5e7eb;
+    background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: all .15s; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #6b7280;
+  }
+  .tab:hover:not(.active) { border-color: var(--tab-color, #3b82f6); color: var(--tab-color, #3b82f6); }
+  .tab.active { border-color: var(--tab-color, #3b82f6); background: var(--tab-color, #3b82f6); color: #fff; }
+  .tab-badge {
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+    background: #f3f4f6; color: #6b7280;
+  }
+  .tab.active .tab-badge { background: rgba(255,255,255,.28); color: #fff; }
+
+  /* ─── Year View (Gantt) ─── */
+  .year-nav {
+    background: #fff; border-radius: 12px; padding: 12px 20px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .year-nav .year-btn {
+    background: #f9fafb; border: 1px solid #e5e7eb; width: 30px; height: 30px;
+    border-radius: 8px; cursor: pointer; font-size: 14px; color: #6b7280;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .year-nav .year-btn:hover { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+  .year-nav .year-label { font-size: 17px; font-weight: 700; color: #0f2c4b; min-width: 90px; text-align: center; }
+  .year-nav .today-hint { font-size: 11px; color: #9ca3af; margin-left: auto; }
+
+  .gantt-wrap {
+    background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .gantt-scroll {
+    overflow-x: auto;
+  }
+  .gantt-inner { min-width: 900px; }
+
+  .gantt-months {
+    display: grid;
+    grid-template-columns: 130px repeat(12, 1fr);
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .gantt-month-cell {
+    padding: 10px 6px;
+    font-size: 11px; font-weight: 700; color: #6b7280;
+    text-align: center;
+    border-right: 1px solid #e5e7eb;
+    letter-spacing: .04em;
+  }
+  .gantt-month-cell:last-child { border-right: none; }
+  .gantt-month-cell:first-child { text-align: left; padding-left: 16px; }
+  .gantt-month-cell.current-month {
+    background: #eff6ff; color: #1d4ed8;
+  }
+
+  .gantt-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    border-bottom: 1px solid #f3f4f6;
+    min-height: 62px;
+  }
+  .gantt-row:last-child { border-bottom: none; }
+
+  .gantt-row-label {
+    padding: 12px 16px;
+    background: #fafafb;
+    border-right: 1px solid #e5e7eb;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700; color: #374151;
+  }
+  .gantt-row-label .cat-swatch {
+    width: 10px; height: 10px; border-radius: 3px;
+  }
+  .gantt-row-label .cat-count {
+    font-size: 10px; color: #9ca3af; font-weight: 500;
+    background: #fff; padding: 1px 6px; border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    margin-left: auto;
+  }
+
+  .gantt-track {
+    position: relative;
+    background:
+      linear-gradient(90deg, transparent 0, transparent calc(100%/12 - 1px), #f3f4f6 calc(100%/12 - 1px), #f3f4f6 calc(100%/12));
+    background-size: calc(100%/12) 100%;
+    min-height: 62px;
+    padding: 6px 0;
+  }
+
+  .today-line {
+    position: absolute; top: 0; bottom: 0;
+    width: 2px; background: #ef4444;
+    z-index: 2; pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(239,68,68,.15);
+  }
+  .today-line::before {
+    content: '今日'; position: absolute; top: -8px; left: 3px;
+    font-size: 9px; font-weight: 700; color: #ef4444;
+    background: #fff; padding: 1px 5px; border-radius: 4px;
+    border: 1px solid #ef4444; white-space: nowrap;
+  }
+
+  .event-bar {
+    position: absolute;
+    height: 24px;
+    border-radius: 5px;
+    background: var(--evt-color);
+    opacity: 0.35;
+    cursor: pointer;
+    transition: opacity .15s, transform .15s;
+    display: flex; align-items: center;
+    padding: 0 8px;
+    overflow: hidden;
+    min-width: 60px;
+    border: 1.5px solid var(--evt-color);
+  }
+  .event-bar:hover { opacity: 0.6; transform: translateY(-1px); }
+  .event-bar .evt-fill {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: var(--evt-color); opacity: 1;
+    border-radius: 3px 0 0 3px;
+    transition: width .4s ease;
+  }
+  .event-bar .evt-label {
+    position: relative; z-index: 1;
+    font-size: 11px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 1px rgba(0,0,0,.25);
+    pointer-events: none;
+  }
+  .event-marker {
+    position: absolute;
+    width: 10px; height: 10px; background: #fff;
+    border: 2px solid var(--evt-color);
+    border-radius: 50%;
+    top: 50%; transform: translate(-50%, -50%);
+    z-index: 3; pointer-events: none;
+  }
+
+  .gantt-empty {
+    padding: 40px 20px; text-align: center; color: #9ca3af;
+    font-size: 13px;
+  }
+
+  /* ─── Year summary strip ─── */
+  .year-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px; margin-bottom: 16px;
+  }
+  .year-summary-card {
+    background: #fff; border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    border-top: 3px solid var(--cat-color);
+  }
+  .ysc-title { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .ysc-count { font-size: 20px; font-weight: 700; color: var(--cat-color); line-height: 1.1; }
+  .ysc-detail { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+  /* ─── Category View ─── */
+  .cat-view-header {
+    background: #fff; border-radius: 12px; padding: 14px 20px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border-left: 4px solid var(--cat-color);
+  }
+  .cat-view-title {
+    font-size: 17px; font-weight: 700; color: #0f2c4b;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cat-view-count {
+    font-size: 12px; color: #6b7280;
+    background: #f9fafb; padding: 4px 10px; border-radius: 6px;
+  }
+  .cat-view-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ─── Event Card ─── */
+  .event-card {
+    background: #fff; border-radius: 12px;
+    margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    overflow: hidden;
+    border-left: 4px solid var(--cat-color);
+  }
+  .event-head {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+    cursor: pointer;
+    transition: background .15s;
+    user-select: none;
+  }
+  .event-head:hover { background: #fafbfc; }
+  .event-chevron {
+    font-size: 11px; color: #9ca3af; transition: transform .2s;
+    width: 14px; text-align: center; flex-shrink: 0;
+  }
+  .event-chevron.open { transform: rotate(90deg); color: #3b82f6; }
+
+  .event-num-badge {
+    font-size: 11px; font-weight: 700; color: #fff;
+    background: var(--cat-color); padding: 3px 9px;
+    border-radius: 99px; white-space: nowrap; flex-shrink: 0;
+  }
+  .event-name-input {
+    font-size: 14px; font-weight: 600; color: #1f2937;
+    border: none; background: transparent;
+    padding: 4px 8px; border-radius: 6px;
+    font-family: inherit;
+    min-width: 200px; flex: 1;
+    transition: background .15s;
+  }
+  .event-name-input:hover { background: #f3f4f6; }
+  .event-name-input:focus {
+    outline: none; background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(59,130,246,.2);
+  }
+  .event-name-input::placeholder { color: #d1d5db; font-weight: 500; }
+
+  .event-date-input {
+    font-size: 12px; color: #6b7280;
+    border: 1px solid #e5e7eb; background: #f9fafb;
+    padding: 4px 8px; border-radius: 6px;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .event-date-input:focus { outline: none; border-color: #3b82f6; background: #fff; }
+
+  .event-progress-block {
+    display: flex; align-items: center; gap: 8px;
+    min-width: 180px; flex-shrink: 0;
+    margin-left: auto;
+  }
+  .event-progress-bar {
+    width: 100px; height: 6px; background: #f3f4f6; border-radius: 99px; overflow: hidden;
+  }
+  .event-progress-fill { height: 100%; border-radius: 99px; background: var(--cat-color); transition: width .4s; }
+  .event-progress-pct { font-size: 13px; font-weight: 700; color: var(--cat-color); min-width: 40px; text-align: right; }
+  .event-progress-score { font-size: 10px; color: #9ca3af; }
+
+  .event-delete-btn {
+    background: transparent; border: none; cursor: pointer;
+    color: #d1d5db; font-size: 16px; padding: 4px 8px;
+    transition: color .15s; border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .event-delete-btn:hover { color: #ef4444; background: #fef2f2; }
+
+  .event-body {
+    display: none;
+    border-top: 1px solid #f3f4f6;
+    padding: 8px 0;
+  }
+  .event-body.open { display: block; }
+
+  /* ─── Phase (Milestone) inside event ─── */
+  .phase {
+    border-left: 3px solid transparent;
+    padding: 10px 20px 10px 17px;
+    transition: background .15s;
+  }
+  .phase:not(:last-child) { border-bottom: 1px solid #f9fafb; }
+  .phase.done { border-left-color: #22c55e; background: linear-gradient(90deg, #f0fdf4 0%, transparent 60%); }
+  .phase.partial { border-left-color: #fbbf24; background: linear-gradient(90deg, #fffbeb 0%, transparent 60%); }
+
+  .phase-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .milestone-dot {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #e5e7eb; color: #6b7280;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    flex-shrink: 0; transition: all .2s;
+  }
+  .phase.done .milestone-dot { background: #22c55e; color: #fff; }
+  .phase.partial .milestone-dot { background: #fbbf24; color: #fff; }
+  .phase-timing {
+    font-size: 12px; font-weight: 700; color: #1f2937;
+  }
+  .phase-work-desc {
+    font-size: 11px; color: #6b7280; flex: 1; min-width: 180px;
+    line-height: 1.4;
+  }
+  .phase-meta {
+    display: flex; align-items: center; gap: 6px;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .phase-mini-bar {
+    width: 50px; height: 4px; background: #e5e7eb; border-radius: 99px; overflow: hidden;
+  }
+  .phase-mini-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+  .phase-pct-text { font-size: 11px; font-weight: 700; color: #374151; min-width: 30px; text-align: right; }
+  .phase-count { font-size: 10px; color: #9ca3af; }
+
+  /* Task table */
+  .task-table {
+    margin-top: 4px; margin-left: 30px;
+    border-radius: 6px; overflow: hidden;
+    border: 1px solid #f3f4f6;
+  }
+  .task-row {
+    display: grid;
+    grid-template-columns: 28px 80px 1fr 50px 92px;
+    gap: 8px;
+    padding: 6px 10px;
+    align-items: center;
+    background: #fff;
+    transition: background .15s;
+    border-bottom: 1px solid #f9fafb;
+  }
+  .task-row:last-child { border-bottom: none; }
+  .task-row:hover { background: #f9fafb; }
+  .task-row.done { background: #f0fdf4; }
+  .task-row.partial { background: #fffbeb; }
+
+  .task-check {
+    width: 20px; height: 20px;
+    border: 2px solid #d1d5db;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: #fff;
+    transition: all .15s;
+    color: transparent;
+    font-size: 13px; font-weight: 700;
+    user-select: none;
+  }
+  .task-check:hover { border-color: #16a34a; }
+  .task-row.done .task-check { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .task-row.partial .task-check { background: #fbbf24; border-color: #fbbf24; color: #fff; }
+
+  .task-id {
+    font-size: 10px; font-weight: 700; color: #6b7280;
+    background: #f3f4f6; padding: 2px 5px; border-radius: 4px;
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    text-align: center; justify-self: start;
+  }
+  .task-name { font-size: 12px; color: #374151; }
+  .task-row.done .task-name { color: #6b7280; text-decoration: line-through; }
+  .task-score { font-size: 10px; color: #9ca3af; text-align: right; font-weight: 600; }
+
+  .status-select {
+    display: inline-flex; border: 1px solid #e5e7eb; border-radius: 5px;
+    overflow: hidden; font-size: 10px;
+  }
+  .status-select button {
+    padding: 3px 6px; border: none; background: #fff; cursor: pointer;
+    color: #9ca3af; font-family: inherit; font-weight: 600;
+    transition: all .15s;
+    border-right: 1px solid #e5e7eb;
+  }
+  .status-select button:last-child { border-right: none; }
+  .status-select button:hover { background: #f3f4f6; color: #374151; }
+  .status-select button.active-yet { background: #e5e7eb; color: #4b5563; }
+  .status-select button.active-wip { background: #fbbf24; color: #fff; }
+  .status-select button.active-done { background: #16a34a; color: #fff; }
+
+  /* Empty state */
+  .empty-state {
+    background: #fff; border-radius: 12px; padding: 40px 20px;
+    text-align: center; color: #9ca3af;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 10px; }
+  .empty-state .title { font-size: 14px; font-weight: 700; color: #6b7280; margin-bottom: 4px; }
+  .empty-state .desc { font-size: 12px; margin-bottom: 16px; }
+
+  /* Tooltip */
+  .evt-tooltip {
+    position: fixed; z-index: 1000;
+    background: #1f2937; color: #fff;
+    padding: 8px 12px; border-radius: 8px;
+    font-size: 12px; line-height: 1.5;
+    box-shadow: 0 6px 16px rgba(0,0,0,.2);
+    pointer-events: none;
+    max-width: 260px;
+    display: none;
+  }
+  .evt-tooltip.show { display: block; }
+  .evt-tooltip strong { color: #fff; }
+  .evt-tooltip .tt-meta { font-size: 11px; color: #d1d5db; margin-top: 2px; }
+
+  /* ─── Tab urgent badge ─── */
+  .tab-urgent-badge {
+    font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 99px;
+    background: #ef4444; color: #fff; margin-left: 2px;
+    animation: pulse-badge 2s ease-in-out infinite;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
+  .tab.active .tab-urgent-badge { background: #fff; color: #ef4444; }
+
+  /* ─── Reminder view ─── */
+  .rem-header {
+    background: #fff; border-radius: 12px; padding: 14px 20px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border-left: 4px solid #ef4444;
+  }
+  .rem-header-title {
+    font-size: 17px; font-weight: 700; color: #0f2c4b;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .rem-header-sub {
+    font-size: 12px; color: #6b7280;
+  }
+  .rem-notif-btn {
+    margin-left: auto;
+  }
+
+  .rem-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px; margin-bottom: 16px;
+  }
+  .rem-summary-card {
+    background: #fff; border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    border-left: 3px solid var(--rem-color);
+    cursor: pointer; transition: transform .15s;
+  }
+  .rem-summary-card:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  .rem-summary-label { font-size: 11px; color: #6b7280; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+  .rem-summary-count { font-size: 22px; font-weight: 700; color: var(--rem-color); line-height: 1.1; }
+  .rem-summary-count .unit { font-size: 12px; color: #9ca3af; font-weight: 500; margin-left: 2px; }
+
+  .rem-section {
+    background: #fff; border-radius: 12px; margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden;
+    border-left: 4px solid var(--rem-color);
+  }
+  .rem-section-head {
+    padding: 12px 18px; background: var(--rem-bg);
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .rem-section-title {
+    font-size: 14px; font-weight: 700; color: var(--rem-color);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rem-section-count {
+    font-size: 11px; color: #6b7280; background: #fff;
+    padding: 2px 8px; border-radius: 99px; margin-left: auto;
+    font-weight: 600;
+  }
+
+  .rem-item {
+    padding: 12px 18px;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 12px; align-items: center;
+    border-bottom: 1px solid #f9fafb;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .rem-item:last-child { border-bottom: none; }
+  .rem-item:hover { background: #fafbfc; }
+  .rem-cat-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--cat-color); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .rem-item-body { min-width: 0; }
+  .rem-item-title {
+    font-size: 13px; font-weight: 700; color: #1f2937;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 3px;
+  }
+  .rem-item-num {
+    font-size: 10px; font-weight: 700; color: #fff;
+    background: var(--cat-color); padding: 1px 7px; border-radius: 99px;
+  }
+  .rem-item-date {
+    font-size: 11px; color: #9ca3af; font-weight: 500;
+  }
+  .rem-item-desc {
+    font-size: 11px; color: #6b7280; line-height: 1.4;
+  }
+  .rem-item-desc strong { color: #1f2937; }
+  .rem-item-progress {
+    display: flex; align-items: center; gap: 6px;
+    flex-shrink: 0; min-width: 90px;
+  }
+  .rem-item-bar {
+    width: 60px; height: 5px; background: #f3f4f6; border-radius: 99px; overflow: hidden;
+  }
+  .rem-item-bar-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+  .rem-item-pct { font-size: 11px; font-weight: 700; color: #6b7280; }
+
+  .rem-days-badge {
+    font-size: 11px; font-weight: 700; padding: 4px 10px;
+    border-radius: 99px; white-space: nowrap; flex-shrink: 0;
+    background: var(--rem-color); color: #fff;
+  }
+  .rem-days-badge.overdue { background: #ef4444; }
+  .rem-days-badge.today { background: #f97316; }
+  .rem-days-badge.this-week { background: #eab308; color: #422006; }
+  .rem-days-badge.upcoming { background: #3b82f6; }
+
+  .rem-empty {
+    padding: 60px 20px; text-align: center; color: #9ca3af;
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .rem-empty .emoji { font-size: 42px; margin-bottom: 8px; }
+  .rem-empty .title { font-size: 14px; font-weight: 700; color: #16a34a; margin-bottom: 4px; }
+  .rem-empty .desc { font-size: 12px; }
+
+  .rem-settings {
+    background: #fff; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    font-size: 12px; color: #6b7280;
+  }
+  .rem-settings-item { display: flex; align-items: center; gap: 6px; }
+  .rem-settings-item strong { color: #1f2937; font-weight: 700; }
+
+  /* Print */
+  @media print {
+    body { background: #fff; padding: 8px; }
+    .page-header, .cat-view-header, .event-card, .gantt-wrap, .year-nav, .year-summary-card {
+      box-shadow: none; border: 1px solid #e5e7eb; break-inside: avoid;
+    }
+    .toolbar, .status-select, .event-delete-btn, .tabs { display: none !important; }
+    .event-body { display: block !important; }
+    .gantt-inner { min-width: 100% !important; }
+  }
+
+  @media (max-width: 720px) {
+    .task-row { grid-template-columns: 24px 68px 1fr; row-gap: 4px; }
+    .task-score, .status-select { grid-column: 2 / -1; justify-self: end; }
+    .event-progress-block { margin-left: 0; min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="page-title">
+      <h1>📅 マルケト年間スケジュール</h1>
+      <div class="subtitle">カテゴリ別に複数案件を並行管理・年間タイムラインで俯瞰・複数ブラウザで同期</div>
+    </div>
+    <div class="overall-stats">
+      <span class="overall-label">全体進捗</span>
+      <div class="overall-bar-wrap">
+        <div class="overall-bar-fill" id="overall-bar" style="width:0%"></div>
+      </div>
+      <div>
+        <div class="overall-pct" id="overall-pct">0%</div>
+        <div class="overall-score" id="overall-score">0 案件</div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="sync-status connecting" id="sync-status">
+        <span class="dot"></span><span id="sync-status-text">接続中...</span>
+      </div>
+      <button class="btn" onclick="exportJSON()">💾 バックアップ</button>
+      <button class="btn" onclick="importJSON()">📥 復元</button>
+      <button class="btn" onclick="window.print()">🖨 印刷</button>
+      <button class="btn btn-danger" onclick="confirmReset()">🔄 全リセット</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <div id="main"></div>
+
+</div>
+
+<div class="evt-tooltip" id="tooltip"></div>
+<input type="file" id="import-file" accept="application/json" style="display:none" onchange="handleImportFile(event)">
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id:'A', name:'入試説明会', icon:'📝', color:'#3b82f6', leadDays:45, followDays:14, unit:'回' },
+  { id:'B', name:'イベント',   icon:'🎪', color:'#8b5cf6', leadDays:35, followDays:5,  unit:'回' },
+  { id:'C', name:'入試',       icon:'📚', color:'#f59e0b', leadDays:21, followDays:3,  unit:'回' },
+  { id:'D', name:'メルマガ',   icon:'📧', color:'#10b981', leadDays:7,  followDays:1,  unit:'号' },
+];
+
+const PARENTS = [
+  {id:'A-01',cat:'入試説明会',timing:'1か月〜1.5か月前',work:'初期設定、フォーム公開案内、事前アンケート項目確認、事前アンケート設定',score:33},
+  {id:'A-02',cat:'入試説明会',timing:'2〜3週間前',work:'当日受付説明書・差込文書作成、事後アンケート項目確認、リマインドメール原稿確認依頼',score:20},
+  {id:'A-03',cat:'入試説明会',timing:'1〜2週間前',work:'差込文書確認依頼、リマインドメール流し込み、事後アンケート設定、返信確認',score:18},
+  {id:'A-04',cat:'入試説明会',timing:'3〜1日前',work:'リマインドメール配信、自動返信差し替え、事前アンケート送付、参加者名簿送付',score:12},
+  {id:'A-05',cat:'入試説明会',timing:'当日〜開催後',work:'当日対応、集計、事後アンケート送付、DB更新、報告',score:17},
+  {id:'B-01',cat:'イベント',timing:'1か月以上前',work:'フォーム作成、自動返信メール更新、フォーム動作確認',score:35},
+  {id:'B-02',cat:'イベント',timing:'開催前数週間',work:'申込者状況報告、申込者人数報告、申込者リスト共有',score:35},
+  {id:'B-03',cat:'イベント',timing:'1週間前後',work:'自動返信差し替え、リマインドメール流し込み、リマインドメール動作確認・配信設定完了報告',score:19},
+  {id:'B-04',cat:'イベント',timing:'3〜1日前〜当日後',work:'開催前日：リマインドメール配信・報告、開催当日：最新申込者数報告・申込者リスト提出、開催翌日：フォーム閉鎖・募集終了対応',score:11},
+  {id:'C-01',cat:'入試',timing:'2〜3週間前',work:'出願者情報Excel作成、紙資料・PDF受領、受領状況確認',score:40},
+  {id:'C-02',cat:'入試',timing:'1〜2週間前',work:'メールアドレス転記、返却用整理、マルケトと最新情報の照合',score:50},
+  {id:'C-03',cat:'入試',timing:'1週間前後〜当日後',work:'リマインドメール確認依頼、募集開始リマインド配信設定、報告、当日対応',score:10},
+  {id:'D-01',cat:'メルマガ',timing:'1週間前まで',work:'原稿作成、原稿確認ご依頼',score:65},
+  {id:'D-02',cat:'メルマガ',timing:'前日まで',work:'マルケト流し込み、配信設定',score:40},
+  {id:'D-03',cat:'メルマガ',timing:'当日〜配信後',work:'配信、配信報告、履歴整理',score:15},
+];
+
+const CHILDREN = [
+  {id:'A-01-1',pid:'A-01',cat:'入試説明会',name:'初期設定（キャンペーンフォルダ作成〜LP URL設定）',score:4},
+  {id:'A-01-1b',pid:'A-01',cat:'入試説明会',name:'初期設定（スマートキャンペーン発火）',score:2},
+  {id:'A-01-1c',pid:'A-01',cat:'入試説明会',name:'初期設定（メール原稿最新化）',score:2},
+  {id:'A-01-1d',pid:'A-01',cat:'入試説明会',name:'初期設定（フォーム設定①）',score:2},
+  {id:'A-01-1e',pid:'A-01',cat:'入試説明会',name:'初期設定（フォーム設定②）',score:2},
+  {id:'A-01-2',pid:'A-01',cat:'入試説明会',name:'フォーム公開案内',score:4},
+  {id:'A-01-3',pid:'A-01',cat:'入試説明会',name:'事前アンケート項目確認依頼',score:7},
+  {id:'A-01-4',pid:'A-01',cat:'入試説明会',name:'事前アンケート設定',score:8},
+  {id:'A-01-5',pid:'A-01',cat:'入試説明会',name:'タスク表・進行表更新',score:6},
+  {id:'A-02-1',pid:'A-02',cat:'入試説明会',name:'当日受付説明書・差込文書作成',score:8},
+  {id:'A-02-2',pid:'A-02',cat:'入試説明会',name:'事後アンケート項目確認依頼',score:6},
+  {id:'A-02-3',pid:'A-02',cat:'入試説明会',name:'リマインドメール原稿確認依頼',score:6},
+  {id:'A-03-1',pid:'A-03',cat:'入試説明会',name:'差込文書確認依頼',score:3},
+  {id:'A-03-2',pid:'A-03',cat:'入試説明会',name:'リマインドメール流し込み',score:6},
+  {id:'A-03-3',pid:'A-03',cat:'入試説明会',name:'事後アンケート設定・流し込み',score:6},
+  {id:'A-03-4',pid:'A-03',cat:'入試説明会',name:'返信確認・関係者フォロー',score:3},
+  {id:'A-04-1',pid:'A-04',cat:'入試説明会',name:'リマインドメール配信',score:4},
+  {id:'A-04-2',pid:'A-04',cat:'入試説明会',name:'自動返信差し替え',score:4},
+  {id:'A-04-3',pid:'A-04',cat:'入試説明会',name:'事前アンケート送付・参加者名簿送付',score:4},
+  {id:'A-05-1',pid:'A-05',cat:'入試説明会',name:'当日対応・事前アンケート集計',score:2},
+  {id:'A-05-2',pid:'A-05',cat:'入試説明会',name:'事後アンケート送付・配信報告',score:3},
+  {id:'A-05-3',pid:'A-05',cat:'入試説明会',name:'事前事後アンケート集計',score:3},
+  {id:'A-05-4',pid:'A-05',cat:'入試説明会',name:'顧客管理表更新・DB作成・重複削除・提出報告',score:9},
+  {id:'B-01-0',pid:'B-01',cat:'イベント',name:'マイトークン設定・トリガー起動',score:10},
+  {id:'B-01-1',pid:'B-01',cat:'イベント',name:'フォーム作成',score:15},
+  {id:'B-01-2',pid:'B-01',cat:'イベント',name:'自動返信メール更新',score:10},
+  {id:'B-01-3',pid:'B-01',cat:'イベント',name:'フォーム動作確認',score:10},
+  {id:'B-02-1',pid:'B-02',cat:'イベント',name:'申込者状況・人数報告',score:20},
+  {id:'B-02-2',pid:'B-02',cat:'イベント',name:'申込者リスト共有・提出',score:15},
+  {id:'B-03-1',pid:'B-03',cat:'イベント',name:'自動返信メール差し替え',score:8},
+  {id:'B-03-2',pid:'B-03',cat:'イベント',name:'リマインドメール流し込み',score:8},
+  {id:'B-03-3',pid:'B-03',cat:'イベント',name:'開催前日：リマインドメール配信・報告',score:3},
+  {id:'B-04-3',pid:'B-04',cat:'イベント',name:'開催当日：最新申込者数報告・申込者リスト提出',score:6},
+  {id:'B-04-4',pid:'B-04',cat:'イベント',name:'開催翌日：フォーム閉鎖・募集終了対応',score:5},
+  {id:'C-01-1',pid:'C-01',cat:'入試',name:'出願者情報Excel作成',score:20},
+  {id:'C-01-2',pid:'C-01',cat:'入試',name:'紙資料・PDF受領',score:10},
+  {id:'C-01-3',pid:'C-01',cat:'入試',name:'受領状況確認',score:10},
+  {id:'C-02-1',pid:'C-02',cat:'入試',name:'メールアドレス転記',score:20},
+  {id:'C-02-2',pid:'C-02',cat:'入試',name:'返却用整理',score:10},
+  {id:'C-02-3',pid:'C-02',cat:'入試',name:'マルケトと最新情報の照合',score:20},
+  {id:'C-03-1',pid:'C-03',cat:'入試',name:'リマインドメール確認依頼',score:5},
+  {id:'C-03-2',pid:'C-03',cat:'入試',name:'募集開始リマインド配信設定・報告',score:5},
+  {id:'D-01-3',pid:'D-01',cat:'メルマガ',name:'原稿作成',score:35},
+  {id:'D-01-4',pid:'D-01',cat:'メルマガ',name:'原稿確認ご依頼',score:30},
+  {id:'D-02-1',pid:'D-02',cat:'メルマガ',name:'マルケト流し込み',score:25},
+  {id:'D-02-2',pid:'D-02',cat:'メルマガ',name:'配信設定',score:15},
+  {id:'D-03-1',pid:'D-03',cat:'メルマガ',name:'配信',score:10},
+  {id:'D-03-2',pid:'D-03',cat:'メルマガ',name:'配信報告',score:5},
+];
+
+// ─── Timing windows for reminders ────────────────────────────────────────────
+// { start: days before event when work should begin,
+//   end:   days before event by which work should be complete (negative = after event) }
+const TIMING_WINDOWS = {
+  '1か月〜1.5か月前':   { start: 45, end: 30 },
+  '2〜3週間前':          { start: 21, end: 14 },
+  '1〜2週間前':          { start: 14, end: 7 },
+  '3〜1日前':            { start: 3,  end: 1 },
+  '当日〜開催後':        { start: 0,  end: -14 },
+  '1か月以上前':         { start: 60, end: 30 },
+  '開催前数週間':        { start: 21, end: 5 },
+  '1週間前後':           { start: 10, end: 3 },
+  '3〜1日前〜当日後':    { start: 3,  end: -1 },
+  '1週間前後〜当日後':   { start: 10, end: -1 },
+  '1週間前まで':         { start: 7,  end: 0 },
+  '前日まで':            { start: 3,  end: 0 },
+  '当日〜配信後':        { start: 0,  end: -2 },
+};
+
+// ─── Firebase Setup ──────────────────────────────────────────────────────────
+// Piggybacks on the same Firebase project as the original marketo tool.
+// Uses a separate path (/marketo_schedule/) so it doesn't conflict.
+const firebaseConfig = {
+  apiKey: "AIzaSyD6NWp2Csi7Q8cbJWQ_3tPewBBUBcMWKgM",
+  authDomain: "intercast-b4747.firebaseapp.com",
+  databaseURL: "https://intercast-b4747-default-rtdb.firebaseio.com",
+  projectId: "intercast-b4747",
+  storageBucket: "intercast-b4747.firebasestorage.app",
+  messagingSenderId: "747137309504",
+  appId: "1:747137309504:web:e608c092817f8d6f7878a5"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const DB_PATH = '/marketo_schedule/events';
+
+// ─── State ───────────────────────────────────────────────────────────────────
+const LOCAL_UI_KEY = 'marketo_year_schedule_ui_v1'; // UI preferences only (year, view)
+let events = []; // { id, cat, name, number, date, taskStatus:{} }
+let currentView = 'yearly'; // 'yearly' or category name
+let currentYear = new Date().getFullYear();
+let expandedEvents = new Set();
+
+// Sync state
+let saveTimer = null;
+let ignoreNextRemote = false;
+let hasReceivedFirstSnapshot = false;
+let isTypingInInput = false;
+let pendingRemoteUpdate = false;
+
+// Load UI preferences from localStorage (not synced across devices)
+try {
+  const raw = localStorage.getItem(LOCAL_UI_KEY);
+  if (raw) {
+    const d = JSON.parse(raw);
+    if (d.currentYear) currentYear = d.currentYear;
+    if (d.currentView) currentView = d.currentView;
+  }
+} catch(e) {}
+
+function saveUIState() {
+  try {
+    localStorage.setItem(LOCAL_UI_KEY, JSON.stringify({ currentYear, currentView }));
+  } catch(e) {}
+}
+
+// ─── Sync status indicator ───────────────────────────────────────────────────
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  const txt = document.getElementById('sync-status-text');
+  if (!el || !txt) return;
+  el.classList.remove('synced', 'saving', 'offline', 'connecting');
+  const map = {
+    connecting: { cls: 'connecting', label: '接続中...' },
+    synced:     { cls: 'synced',     label: '同期中 🟢' },
+    saving:     { cls: 'saving',     label: '保存中...' },
+    offline:    { cls: 'offline',    label: 'オフライン' },
+    error:      { cls: 'offline',    label: 'エラー' },
+  };
+  const m = map[status] || map.connecting;
+  el.classList.add(m.cls);
+  txt.textContent = m.label;
+}
+
+// ─── Firebase read (subscribe) ───────────────────────────────────────────────
+function subscribeToFirebase() {
+  setSyncStatus('connecting');
+
+  // Track connection state
+  db.ref('.info/connected').on('value', snap => {
+    if (snap.val() === true) {
+      if (hasReceivedFirstSnapshot) setSyncStatus('synced');
+    } else {
+      setSyncStatus('offline');
+    }
+  });
+
+  db.ref(DB_PATH).on('value', snapshot => {
+    if (ignoreNextRemote) {
+      // Local change echoed back; skip re-render to avoid clobbering input state
+      ignoreNextRemote = false;
+      hasReceivedFirstSnapshot = true;
+      setSyncStatus('synced');
+      return;
+    }
+    const val = snapshot.val();
+    events = val ? Object.values(val) : [];
+    hasReceivedFirstSnapshot = true;
+    setSyncStatus('synced');
+    if (isTypingInInput) {
+      // Defer render until user finishes typing to avoid interrupting them
+      pendingRemoteUpdate = true;
+    } else {
+      render();
+      maybeNotifyOnLoad();
+    }
+  }, err => {
+    console.error('Firebase read error:', err);
+    setSyncStatus('error');
+  });
+}
+
+// ─── Firebase write (debounced) ──────────────────────────────────────────────
+function save() {
+  if (saveTimer) clearTimeout(saveTimer);
+  setSyncStatus('saving');
+  saveTimer = setTimeout(() => {
+    const eventsObj = {};
+    events.forEach(e => { eventsObj[e.id] = e; });
+    ignoreNextRemote = true;
+    db.ref(DB_PATH).set(Object.keys(eventsObj).length ? eventsObj : null)
+      .then(() => setSyncStatus('synced'))
+      .catch(err => {
+        console.error('Firebase write error:', err);
+        setSyncStatus('error');
+        ignoreNextRemote = false;
+      });
+  }, 500);
+}
+
+// Track when user is typing in an input to defer remote updates
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches('input, textarea')) isTypingInInput = true;
+});
+document.addEventListener('focusout', (e) => {
+  if (e.target.matches('input, textarea')) {
+    isTypingInInput = false;
+    if (pendingRemoteUpdate) {
+      pendingRemoteUpdate = false;
+      render();
+    }
+  }
+});
+
+// ─── Event CRUD ──────────────────────────────────────────────────────────────
+function nextEventNumber(cat) {
+  const list = events.filter(e => e.cat === cat);
+  if (!list.length) return 1;
+  return Math.max(...list.map(e => parseInt(e.number) || 0)) + 1;
+}
+
+function addEvent(cat) {
+  const num = nextEventNumber(cat);
+  const evt = {
+    id: 'evt-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+    cat: cat,
+    name: '',
+    number: num,
+    date: '',
+    taskStatus: {}
+  };
+  events.push(evt);
+  expandedEvents.add(evt.id);
+  save();
+  render();
+}
+
+function deleteEvent(id) {
+  const evt = events.find(e => e.id === id);
+  if (!evt) return;
+  const label = evt.name || `第${evt.number}${getCatConfig(evt.cat).unit}`;
+  if (!confirm(`「${label}」を削除します。よろしいですか？`)) return;
+  events = events.filter(e => e.id !== id);
+  expandedEvents.delete(id);
+  save();
+  render();
+}
+
+function duplicateEvent(id) {
+  const evt = events.find(e => e.id === id);
+  if (!evt) return;
+  const newEvt = {
+    ...evt,
+    id: 'evt-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+    number: nextEventNumber(evt.cat),
+    date: '',
+    taskStatus: {} // fresh checklist
+  };
+  events.push(newEvt);
+  expandedEvents.add(newEvt.id);
+  save();
+  render();
+}
+
+function updateEventField(id, field, value) {
+  const evt = events.find(e => e.id === id);
+  if (!evt) return;
+  evt[field] = value;
+  save();
+  // For text/date updates during typing, we don't need to re-render everything
+  // But we do need to update the yearly summary counts if the date changed
+  if (field === 'date') updateOverallStats();
+}
+
+function toggleEventExpand(id) {
+  if (expandedEvents.has(id)) expandedEvents.delete(id);
+  else expandedEvents.add(id);
+  renderMain();
+}
+
+function getCatConfig(catName) {
+  return CATEGORIES.find(c => c.name === catName) || CATEGORIES[0];
+}
+
+// ─── Task status ─────────────────────────────────────────────────────────────
+function getTaskStatus(evtId, taskId) {
+  const evt = events.find(e => e.id === evtId);
+  if (!evt || !evt.taskStatus) return '未着手';
+  return evt.taskStatus[taskId] || '未着手';
+}
+
+function setTaskStatus(evtId, taskId, status) {
+  const evt = events.find(e => e.id === evtId);
+  if (!evt) return;
+  if (!evt.taskStatus) evt.taskStatus = {};
+  evt.taskStatus[taskId] = status;
+  save();
+  render();
+}
+
+function cycleTaskStatus(evtId, taskId) {
+  const cur = getTaskStatus(evtId, taskId);
+  const next = cur === '未着手' ? '完了' : cur === '完了' ? '進行中' : '未着手';
+  setTaskStatus(evtId, taskId, next);
+}
+
+// ─── Progress ────────────────────────────────────────────────────────────────
+function taskPoints(evtId, taskId, score) {
+  const s = getTaskStatus(evtId, taskId);
+  if (s === '完了') return score;
+  if (s === '進行中') return score * 0.5;
+  return 0;
+}
+
+function eventProgress(evt) {
+  const kids = CHILDREN.filter(c => c.cat === evt.cat);
+  const total = kids.reduce((a,c) => a + c.score, 0);
+  const earned = kids.reduce((a,c) => a + taskPoints(evt.id, c.id, c.score), 0);
+  return { total, earned, pct: total > 0 ? Math.round(earned/total*100) : 0 };
+}
+
+function phaseProgress(evtId, pid) {
+  const kids = CHILDREN.filter(c => c.pid === pid);
+  const total = kids.reduce((a,c) => a + c.score, 0);
+  const earned = kids.reduce((a,c) => a + taskPoints(evtId, c.id, c.score), 0);
+  return { total, earned, pct: total > 0 ? Math.round(earned/total*100) : 0 };
+}
+
+// ─── Reminder logic ──────────────────────────────────────────────────────────
+function daysBetween(dateStr) {
+  // Returns days from today to dateStr (positive = future)
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const d = new Date(dateStr);
+  d.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+
+function phaseStatus(evt, phase) {
+  const pp = phaseProgress(evt.id, phase.id);
+  if (!evt.date) return { code: 'no-date', progress: pp };
+  if (pp.pct === 100) return { code: 'done', progress: pp };
+
+  const w = TIMING_WINDOWS[phase.timing];
+  if (!w) return { code: 'unknown', progress: pp };
+
+  const daysUntil = daysBetween(evt.date);
+
+  if (daysUntil > w.start) {
+    return { code: 'upcoming', daysUntilStart: daysUntil - w.start, progress: pp };
+  }
+  if (daysUntil >= w.end) {
+    return { code: 'current', daysUntilDeadline: daysUntil - w.end, progress: pp };
+  }
+  return { code: 'overdue', daysOverdue: w.end - daysUntil, progress: pp };
+}
+
+function getReminders() {
+  const r = { overdue: [], today: [], thisWeek: [], upcoming: [] };
+  events.forEach(evt => {
+    if (!evt.date) return;
+    PARENTS.filter(p => p.cat === evt.cat).forEach(phase => {
+      const s = phaseStatus(evt, phase);
+      if (s.code === 'overdue') {
+        r.overdue.push({ evt, phase, ...s });
+      } else if (s.code === 'current') {
+        if (s.daysUntilDeadline <= 3) r.today.push({ evt, phase, ...s });
+        else r.thisWeek.push({ evt, phase, ...s });
+      } else if (s.code === 'upcoming' && s.daysUntilStart <= 7) {
+        r.upcoming.push({ evt, phase, ...s });
+      }
+    });
+  });
+  r.overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
+  r.today.sort((a, b) => a.daysUntilDeadline - b.daysUntilDeadline);
+  r.thisWeek.sort((a, b) => a.daysUntilDeadline - b.daysUntilDeadline);
+  r.upcoming.sort((a, b) => a.daysUntilStart - b.daysUntilStart);
+  return r;
+}
+
+function urgentCount() {
+  const r = getReminders();
+  return r.overdue.length + r.today.length;
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────────────
+function render() {
+  renderTabs();
+  renderMain();
+  updateOverallStats();
+}
+
+function updateOverallStats() {
+  const total = events.length;
+  let sumPct = 0;
+  events.forEach(e => { sumPct += eventProgress(e).pct; });
+  const avg = total > 0 ? Math.round(sumPct/total) : 0;
+  document.getElementById('overall-bar').style.width = avg + '%';
+  document.getElementById('overall-pct').textContent = avg + '%';
+  document.getElementById('overall-score').textContent = `${total} 案件（平均進捗）`;
+}
+
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  const urgent = urgentCount();
+  const urgentBadge = urgent > 0 ? `<span class="tab-urgent-badge">⚠ ${urgent}</span>` : '';
+  const reminderBtn = `<button class="tab ${currentView === 'reminder' ? 'active' : ''}" style="--tab-color:#ef4444" onclick="switchView('reminder')">🔔 リマインダー${urgentBadge}</button>`;
+  const yearlyBtn = `<button class="tab ${currentView === 'yearly' ? 'active' : ''}" style="--tab-color:#0ea5e9" onclick="switchView('yearly')">📅 年間スケジュール</button>`;
+  const catBtns = CATEGORIES.map(cat => {
+    const count = events.filter(e => e.cat === cat.name).length;
+    return `<button class="tab ${currentView === cat.name ? 'active' : ''}" style="--tab-color:${cat.color}" onclick="switchView('${cat.name}')">${cat.icon} ${cat.name}${count > 0 ? ` <span class="tab-badge">${count}</span>` : ''}</button>`;
+  }).join('');
+  el.innerHTML = reminderBtn + yearlyBtn + catBtns;
+}
+
+function switchView(v) {
+  currentView = v;
+  saveUIState();
+  renderMain();
+  renderTabs();
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+  if (currentView === 'reminder') {
+    main.innerHTML = renderReminder();
+  } else if (currentView === 'yearly') {
+    main.innerHTML = renderYearly();
+    setupTooltips();
+  } else {
+    main.innerHTML = renderCategory(currentView);
+  }
+}
+
+// ─── Yearly (Gantt) View ─────────────────────────────────────────────────────
+function daysInYear(y) {
+  return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
+}
+function dayOfYear(dateStr) {
+  const d = new Date(dateStr);
+  const start = new Date(d.getFullYear(), 0, 0);
+  const diff = d - start;
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+function pctInYear(dateStr, year) {
+  const d = new Date(dateStr);
+  const days = daysInYear(year);
+  const yearStart = new Date(year, 0, 1);
+  const diff = (d - yearStart) / (1000 * 60 * 60 * 24);
+  return (diff / days) * 100;
+}
+
+function renderYearly() {
+  // Year summary cards
+  const summaryHTML = CATEGORIES.map(cat => {
+    const catEvents = events.filter(e => e.cat === cat.name && e.date && new Date(e.date).getFullYear() === currentYear);
+    const done = catEvents.filter(e => eventProgress(e).pct === 100).length;
+    return `
+      <div class="year-summary-card" style="--cat-color:${cat.color}">
+        <div class="ysc-title">${cat.icon} ${cat.name}</div>
+        <div class="ysc-count">${catEvents.length}<span style="font-size:12px;color:#9ca3af"> ${cat.unit}</span></div>
+        <div class="ysc-detail">うち完了 ${done}${cat.unit} / 未確定日 ${events.filter(e => e.cat === cat.name && !e.date).length}件</div>
+      </div>`;
+  }).join('');
+
+  // Year navigator
+  const navHTML = `
+    <div class="year-nav">
+      <button class="year-btn" onclick="changeYear(-1)">◀</button>
+      <span class="year-label">${currentYear}年</span>
+      <button class="year-btn" onclick="changeYear(1)">▶</button>
+      <button class="btn" style="margin-left:10px" onclick="jumpToday()">今日にジャンプ</button>
+      <span class="today-hint">💡 バーをクリックで詳細画面に移動</span>
+    </div>`;
+
+  // Month header
+  const monthLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const nowY = new Date().getFullYear();
+  const nowM = new Date().getMonth();
+  const monthHTML = `
+    <div class="gantt-months">
+      <div class="gantt-month-cell">カテゴリ</div>
+      ${monthLabels.map((m,i) => `<div class="gantt-month-cell ${nowY===currentYear && nowM===i ? 'current-month' : ''}">${m}</div>`).join('')}
+    </div>`;
+
+  // Today line
+  let todayLineHTML = '';
+  const todayPct = pctInYear(new Date().toISOString().slice(0,10), currentYear);
+  if (todayPct >= 0 && todayPct <= 100) {
+    todayLineHTML = `<div class="today-line" style="left:${todayPct}%"></div>`;
+  }
+
+  // Rows per category
+  const rowsHTML = CATEGORIES.map(cat => {
+    const catEvents = events.filter(e => e.cat === cat.name && e.date);
+    // Filter to events that intersect with this year
+    const visible = catEvents.filter(e => {
+      const dt = new Date(e.date);
+      const start = new Date(dt.getTime() - cat.leadDays * 86400000);
+      const end = new Date(dt.getTime() + cat.followDays * 86400000);
+      return end.getFullYear() >= currentYear && start.getFullYear() <= currentYear;
+    });
+
+    const barsHTML = visible.map((e, i) => {
+      const dt = new Date(e.date);
+      const startDate = new Date(dt.getTime() - cat.leadDays * 86400000);
+      const endDate = new Date(dt.getTime() + cat.followDays * 86400000);
+      const startPct = Math.max(0, pctInYear(startDate.toISOString().slice(0,10), currentYear));
+      const endPct = Math.min(100, pctInYear(endDate.toISOString().slice(0,10), currentYear));
+      const widthPct = endPct - startPct;
+      const evtPct = pctInYear(e.date, currentYear);
+      const prog = eventProgress(e);
+      const label = e.name || `第${e.number}${cat.unit}`;
+      // Stack vertically to avoid overlap
+      const topOffset = 8 + (i % 2) * 28;
+      return `
+        <div class="event-bar"
+             style="--evt-color:${cat.color};left:${startPct}%;width:${widthPct}%;top:${topOffset}px"
+             data-evt-id="${e.id}"
+             data-tooltip="${escapeHtml(label)}|${e.date}|進捗 ${prog.pct}%|${cat.name}"
+             onclick="jumpToEvent('${e.id}')">
+          <div class="evt-fill" style="width:${prog.pct}%"></div>
+          <span class="evt-label">${escapeHtml(label)} · ${prog.pct}%</span>
+        </div>
+        <div class="event-marker" style="--evt-color:${cat.color};left:${evtPct}%;top:${topOffset + 12}px"></div>`;
+    }).join('');
+
+    const maxRows = Math.max(1, Math.ceil(visible.length / 1));
+    const rowHeight = Math.max(62, 8 + Math.min(visible.length, 6) * 28);
+
+    return `
+      <div class="gantt-row" style="min-height:${rowHeight}px">
+        <div class="gantt-row-label">
+          <span class="cat-swatch" style="background:${cat.color}"></span>
+          <span>${cat.icon} ${cat.name}</span>
+          <span class="cat-count">${visible.length}</span>
+        </div>
+        <div class="gantt-track" style="min-height:${rowHeight}px">
+          ${todayLineHTML}
+          ${barsHTML || `<div style="padding:18px 12px;font-size:11px;color:#d1d5db">この年に該当する案件はありません</div>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  const totalEventsInYear = events.filter(e => e.date && new Date(e.date).getFullYear() === currentYear).length;
+  const emptyState = totalEventsInYear === 0 && events.length === 0
+    ? `<div class="empty-state">
+         <div class="emoji">🗓️</div>
+         <div class="title">まだ案件が登録されていません</div>
+         <div class="desc">上のタブから各カテゴリを開き「新規案件を追加」してください。</div>
+       </div>` : '';
+
+  return `
+    <div class="year-summary">${summaryHTML}</div>
+    ${navHTML}
+    <div class="gantt-wrap">
+      <div class="gantt-scroll">
+        <div class="gantt-inner">
+          ${monthHTML}
+          ${rowsHTML}
+        </div>
+      </div>
+    </div>
+    ${emptyState}`;
+}
+
+function changeYear(delta) {
+  currentYear += delta;
+  saveUIState();
+  renderMain();
+}
+function jumpToday() {
+  currentYear = new Date().getFullYear();
+  saveUIState();
+  renderMain();
+}
+function jumpToEvent(evtId) {
+  const evt = events.find(e => e.id === evtId);
+  if (!evt) return;
+  currentView = evt.cat;
+  expandedEvents.add(evtId);
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('evt-' + evtId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+// Tooltip setup
+function setupTooltips() {
+  const bars = document.querySelectorAll('.event-bar[data-tooltip]');
+  const tt = document.getElementById('tooltip');
+  bars.forEach(bar => {
+    bar.addEventListener('mouseenter', (e) => {
+      const parts = bar.dataset.tooltip.split('|');
+      tt.innerHTML = `<strong>${parts[0]}</strong>
+        <div class="tt-meta">📅 開催日: ${parts[1]}</div>
+        <div class="tt-meta">📊 ${parts[2]}</div>
+        <div class="tt-meta">${parts[3]}</div>`;
+      tt.classList.add('show');
+    });
+    bar.addEventListener('mousemove', (e) => {
+      tt.style.left = (e.clientX + 14) + 'px';
+      tt.style.top = (e.clientY + 14) + 'px';
+    });
+    bar.addEventListener('mouseleave', () => {
+      tt.classList.remove('show');
+    });
+  });
+}
+
+// ─── Reminder View ───────────────────────────────────────────────────────────
+function renderReminder() {
+  const r = getReminders();
+  const totalItems = r.overdue.length + r.today.length + r.thisWeek.length + r.upcoming.length;
+  const totalEventsWithDate = events.filter(e => e.date).length;
+
+  const notifBtnHTML = renderNotificationButton();
+
+  const headerHTML = `
+    <div class="rem-header">
+      <div>
+        <div class="rem-header-title">🔔 リマインダー</div>
+        <div class="rem-header-sub">開催日と作業タイミングから自動で「今やるべきこと」を抽出</div>
+      </div>
+      <div class="rem-notif-btn">${notifBtnHTML}</div>
+    </div>`;
+
+  const settingsHTML = `
+    <div class="rem-settings">
+      <div class="rem-settings-item">📅 対象案件: <strong>${totalEventsWithDate}件</strong>（開催日入力済）</div>
+      <div class="rem-settings-item">📌 今日: <strong>${new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' })}</strong></div>
+      <div class="rem-settings-item" style="margin-left:auto">💡 各項目クリックで該当案件へジャンプ</div>
+    </div>`;
+
+  // Summary cards
+  const summaryHTML = `
+    <div class="rem-summary">
+      <div class="rem-summary-card" style="--rem-color:#ef4444" onclick="scrollToSection('sec-overdue')">
+        <div class="rem-summary-label">🚨 遅延中</div>
+        <div class="rem-summary-count">${r.overdue.length}<span class="unit">件</span></div>
+      </div>
+      <div class="rem-summary-card" style="--rem-color:#f97316" onclick="scrollToSection('sec-today')">
+        <div class="rem-summary-label">⏰ 今日〜3日以内</div>
+        <div class="rem-summary-count">${r.today.length}<span class="unit">件</span></div>
+      </div>
+      <div class="rem-summary-card" style="--rem-color:#eab308" onclick="scrollToSection('sec-week')">
+        <div class="rem-summary-label">📅 今週中</div>
+        <div class="rem-summary-count">${r.thisWeek.length}<span class="unit">件</span></div>
+      </div>
+      <div class="rem-summary-card" style="--rem-color:#3b82f6" onclick="scrollToSection('sec-upcoming')">
+        <div class="rem-summary-label">📆 まもなく開始</div>
+        <div class="rem-summary-count">${r.upcoming.length}<span class="unit">件</span></div>
+      </div>
+    </div>`;
+
+  if (totalItems === 0) {
+    return headerHTML + settingsHTML + summaryHTML + `
+      <div class="rem-empty">
+        <div class="emoji">🎉</div>
+        <div class="title">対応が必要な作業はありません</div>
+        <div class="desc">${totalEventsWithDate === 0
+          ? '案件に開催日を設定するとリマインダーが表示されます'
+          : '全ての作業が予定通り進んでいます。この調子で！'}</div>
+      </div>`;
+  }
+
+  const sections = [
+    { id: 'sec-overdue', title: '🚨 遅延中', items: r.overdue, color: '#ef4444', bg: '#fef2f2', badgeCls: 'overdue',
+      dayLabel: it => `${it.daysOverdue}日 超過` },
+    { id: 'sec-today', title: '⏰ 今日〜3日以内に対応', items: r.today, color: '#f97316', bg: '#fff7ed', badgeCls: 'today',
+      dayLabel: it => it.daysUntilDeadline === 0 ? '本日まで' : `あと ${it.daysUntilDeadline}日` },
+    { id: 'sec-week', title: '📅 今週中に対応', items: r.thisWeek, color: '#eab308', bg: '#fefce8', badgeCls: 'this-week',
+      dayLabel: it => `あと ${it.daysUntilDeadline}日` },
+    { id: 'sec-upcoming', title: '📆 まもなく開始（1週間以内）', items: r.upcoming, color: '#3b82f6', bg: '#eff6ff', badgeCls: 'upcoming',
+      dayLabel: it => `${it.daysUntilStart}日後 開始` },
+  ];
+
+  const sectionsHTML = sections.filter(s => s.items.length > 0).map(s => {
+    const itemsHTML = s.items.map(it => {
+      const cat = getCatConfig(it.evt.cat);
+      const evtLabel = it.evt.name || `第${it.evt.number}${cat.unit}`;
+      const dt = new Date(it.evt.date);
+      const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}(${['日','月','火','水','木','金','土'][dt.getDay()]})`;
+      const daysToEvt = daysBetween(it.evt.date);
+      const evtDayLabel = daysToEvt > 0 ? `開催まで${daysToEvt}日` : daysToEvt === 0 ? '本日開催' : `${-daysToEvt}日経過`;
+      const remaining = CHILDREN.filter(c => c.pid === it.phase.id && getTaskStatus(it.evt.id, c.id) !== '完了').length;
+      return `
+        <div class="rem-item" style="--cat-color:${cat.color};--rem-color:${s.color}" onclick="jumpToEvent('${it.evt.id}')">
+          <div class="rem-cat-icon">${cat.icon}</div>
+          <div class="rem-item-body">
+            <div class="rem-item-title">
+              <span>${escapeHtml(evtLabel)}</span>
+              <span class="rem-item-num">第${it.evt.number}${cat.unit}</span>
+              <span class="rem-item-date">📅 ${dateLabel} · ${evtDayLabel}</span>
+            </div>
+            <div class="rem-item-desc">
+              <strong>${escapeHtml(it.phase.timing)}</strong> ／ 未完了 ${remaining}タスク：${escapeHtml(it.phase.work)}
+            </div>
+          </div>
+          <div class="rem-item-progress">
+            <div class="rem-item-bar"><div class="rem-item-bar-fill" style="width:${it.progress.pct}%;background:${cat.color}"></div></div>
+            <span class="rem-item-pct">${it.progress.pct}%</span>
+          </div>
+          <span class="rem-days-badge ${s.badgeCls}">${s.dayLabel(it)}</span>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="rem-section" id="${s.id}" style="--rem-color:${s.color};--rem-bg:${s.bg}">
+        <div class="rem-section-head">
+          <span class="rem-section-title">${s.title}</span>
+          <span class="rem-section-count">${s.items.length}件</span>
+        </div>
+        ${itemsHTML}
+      </div>`;
+  }).join('');
+
+  return headerHTML + settingsHTML + summaryHTML + sectionsHTML;
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─── Browser Notifications ───────────────────────────────────────────────────
+function renderNotificationButton() {
+  if (!('Notification' in window)) {
+    return `<span style="font-size:11px;color:#9ca3af">このブラウザは通知非対応</span>`;
+  }
+  const p = Notification.permission;
+  if (p === 'granted') {
+    return `<button class="btn" onclick="testNotification()" title="現在の未対応件数でテスト通知を送ります">🔔 通知は有効です</button>`;
+  }
+  if (p === 'denied') {
+    return `<span style="font-size:11px;color:#9ca3af">通知はブラウザ設定でブロックされています</span>`;
+  }
+  return `<button class="btn btn-primary" onclick="requestNotification()">🔔 ブラウザ通知を有効にする</button>`;
+}
+
+function requestNotification() {
+  if (!('Notification' in window)) return;
+  Notification.requestPermission().then(perm => {
+    renderMain();
+    if (perm === 'granted') {
+      showReminderNotification();
+    }
+  });
+}
+
+function testNotification() {
+  showReminderNotification(true);
+}
+
+function showReminderNotification(isTest = false) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const r = getReminders();
+  const urgent = r.overdue.length + r.today.length;
+  if (urgent === 0 && !isTest) return;
+  const parts = [];
+  if (r.overdue.length) parts.push(`🚨 遅延 ${r.overdue.length}件`);
+  if (r.today.length) parts.push(`⏰ 今日 ${r.today.length}件`);
+  if (r.thisWeek.length) parts.push(`📅 今週 ${r.thisWeek.length}件`);
+  const body = parts.length ? parts.join(' / ') : '対応が必要な作業はありません 🎉';
+  try {
+    new Notification('マルケト作業リマインダー', {
+      body: body,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🔔</text></svg>',
+      tag: 'marketo-reminder',
+    });
+  } catch(e) { console.warn('通知の表示に失敗:', e); }
+}
+
+// Check on page load, only once per browser session
+let notifiedThisSession = false;
+function maybeNotifyOnLoad() {
+  if (notifiedThisSession) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const urgent = urgentCount();
+  if (urgent > 0) {
+    showReminderNotification();
+    notifiedThisSession = true;
+  }
+}
+
+// ─── Category View ───────────────────────────────────────────────────────────
+function renderCategory(catName) {
+  const cat = getCatConfig(catName);
+  const catEvents = events
+    .filter(e => e.cat === catName)
+    .sort((a, b) => {
+      // Sort by date (no date last), then by number
+      if (!a.date && !b.date) return (a.number||0) - (b.number||0);
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date) - new Date(b.date);
+    });
+
+  const headerHTML = `
+    <div class="cat-view-header" style="--cat-color:${cat.color}">
+      <span class="cat-view-title">${cat.icon} ${cat.name}</span>
+      <span class="cat-view-count">${catEvents.length} ${cat.unit}の案件</span>
+      <div class="cat-view-actions">
+        <button class="btn btn-primary" onclick="addEvent('${catName}')">＋ 新規案件を追加</button>
+      </div>
+    </div>`;
+
+  if (!catEvents.length) {
+    return headerHTML + `
+      <div class="empty-state">
+        <div class="emoji">${cat.icon}</div>
+        <div class="title">${catName} の案件がまだありません</div>
+        <div class="desc">上の「＋ 新規案件を追加」から最初の案件を作成してください。</div>
+      </div>`;
+  }
+
+  const cardsHTML = catEvents.map(e => renderEventCard(e, cat)).join('');
+  return headerHTML + cardsHTML;
+}
+
+function renderEventCard(evt, cat) {
+  const prog = eventProgress(evt);
+  const isOpen = expandedEvents.has(evt.id);
+
+  const phases = PARENTS.filter(p => p.cat === cat.name);
+  const phaseHTML = phases.map((p, idx) => {
+    const pp = phaseProgress(evt.id, p.id);
+    const phaseClass = pp.pct === 100 ? 'done' : pp.pct > 0 ? 'partial' : '';
+    const kids = CHILDREN.filter(c => c.pid === p.id);
+    const kidHTML = kids.map(c => {
+      const st = getTaskStatus(evt.id, c.id);
+      const rowClass = st === '完了' ? 'done' : st === '進行中' ? 'partial' : '';
+      return `
+        <div class="task-row ${rowClass}">
+          <div class="task-check" onclick="cycleTaskStatus('${evt.id}','${c.id}')" title="クリックで状態を切替">${st === '完了' ? '✓' : st === '進行中' ? '◐' : ''}</div>
+          <span class="task-id">${c.id}</span>
+          <span class="task-name">${escapeHtml(c.name)}</span>
+          <span class="task-score">${c.score}点</span>
+          <div class="status-select">
+            <button class="${st==='未着手'?'active-yet':''}" onclick="setTaskStatus('${evt.id}','${c.id}','未着手')">未</button>
+            <button class="${st==='進行中'?'active-wip':''}" onclick="setTaskStatus('${evt.id}','${c.id}','進行中')">中</button>
+            <button class="${st==='完了'?'active-done':''}" onclick="setTaskStatus('${evt.id}','${c.id}','完了')">完</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="phase ${phaseClass}">
+        <div class="phase-head">
+          <span class="milestone-dot">${idx + 1}</span>
+          <span class="phase-timing">${escapeHtml(p.timing)}</span>
+          <span class="phase-work-desc">${escapeHtml(p.work)}</span>
+          <div class="phase-meta">
+            <div class="phase-mini-bar"><div class="phase-mini-fill" style="width:${pp.pct}%;background:${cat.color}"></div></div>
+            <span class="phase-pct-text">${pp.pct}%</span>
+            <span class="phase-count">${pp.earned}/${pp.total}点</span>
+          </div>
+        </div>
+        <div class="task-table">${kidHTML}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="event-card" id="evt-${evt.id}" style="--cat-color:${cat.color}">
+      <div class="event-head" onclick="toggleEventExpand('${evt.id}')">
+        <span class="event-chevron ${isOpen ? 'open' : ''}">▶</span>
+        <span class="event-num-badge">第${evt.number}${cat.unit}</span>
+        <input class="event-name-input"
+               type="text"
+               placeholder="案件名を入力（例：${samplePlaceholder(cat.name)}）"
+               value="${escapeHtml(evt.name)}"
+               onclick="event.stopPropagation()"
+               oninput="updateEventField('${evt.id}','name',this.value)">
+        <input class="event-date-input"
+               type="date"
+               value="${escapeHtml(evt.date)}"
+               onclick="event.stopPropagation()"
+               oninput="updateEventField('${evt.id}','date',this.value)">
+        <div class="event-progress-block">
+          <div class="event-progress-bar"><div class="event-progress-fill" style="width:${prog.pct}%"></div></div>
+          <span class="event-progress-pct">${prog.pct}%</span>
+          <span class="event-progress-score">${prog.earned}/${prog.total}点</span>
+        </div>
+        <button class="event-delete-btn" onclick="event.stopPropagation();duplicateEvent('${evt.id}')" title="この案件を複製（新しい回として追加）">⎘</button>
+        <button class="event-delete-btn" onclick="event.stopPropagation();deleteEvent('${evt.id}')" title="この案件を削除">✕</button>
+      </div>
+      <div class="event-body ${isOpen ? 'open' : ''}">${phaseHTML}</div>
+    </div>`;
+}
+
+function samplePlaceholder(cat) {
+  const samples = {
+    '入試説明会': '第◯回入試説明会',
+    'イベント': '青山XXXXXフォーラム',
+    '入試': 'A方式 第◯期',
+    'メルマガ': 'Vol.XXX'
+  };
+  return samples[cat] || cat;
+}
+
+// ─── Import / Export / Reset ─────────────────────────────────────────────────
+function confirmReset() {
+  if (!confirm('全ての案件と実施状況を Firebase から削除します。全てのブラウザに反映されます。この操作は取り消せません。よろしいですか？')) return;
+  if (!confirm('本当によろしいですか？（もう一度確認）')) return;
+  events = [];
+  expandedEvents.clear();
+  save();
+  render();
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify({ events, currentYear, exportedAt: new Date().toISOString() }, null, 2)],
+                       { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `marketo_schedule_${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON() {
+  document.getElementById('import-file').click();
+}
+
+function handleImportFile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.events || !Array.isArray(data.events)) throw new Error('不正な形式');
+      if (!confirm(`${data.events.length} 件の案件データを読み込みます。既存のデータは上書きされます。よろしいですか？`)) return;
+      events = data.events;
+      if (data.currentYear) currentYear = data.currentYear;
+      save();
+      render();
+      alert('読み込みが完了しました');
+    } catch (err) {
+      alert('ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = ''; // reset
+}
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[m]);
+}
+
+// Init — render initial (empty) UI, then subscribe to Firebase.
+// The first snapshot will replace `events` and trigger a re-render.
+render();
+subscribeToFirebase();
+</script>
+
+</body>
+</html>
