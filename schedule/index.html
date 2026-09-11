@@ -673,6 +673,7 @@ const CATEGORIES = [
   { id:'B', name:'イベント',   icon:'🎪', color:'#8b5cf6', leadDays:35, followDays:5,  unit:'回' },
   { id:'C', name:'入試',       icon:'📚', color:'#f59e0b', leadDays:21, followDays:3,  unit:'回' },
   { id:'D', name:'メルマガ',   icon:'📧', color:'#10b981', leadDays:7,  followDays:1,  unit:'号' },
+  { id:'E', name:'博士課程入試説明会', icon:'🎓', color:'#6366f1', leadDays:21, followDays:2, unit:'回' },
 ];
 
 const PARENTS = [
@@ -691,6 +692,8 @@ const PARENTS = [
   {id:'D-01',cat:'メルマガ',timing:'1週間前まで',work:'原稿作成、原稿確認ご依頼',score:65},
   {id:'D-02',cat:'メルマガ',timing:'前日まで',work:'マルケト流し込み、配信設定',score:40},
   {id:'D-03',cat:'メルマガ',timing:'当日〜配信後',work:'配信、配信報告、履歴整理',score:15},
+  {id:'E-01',cat:'博士課程入試説明会',timing:'2〜3週間前',work:'申込みフォーム・キャンセルフォーム作成（事前アンケートなし）',score:25},
+  {id:'E-02',cat:'博士課程入試説明会',timing:'1〜2週間前',work:'各種受付メール設定（管理者通知・自動返信）',score:24},
 ];
 
 const CHILDREN = [
@@ -742,6 +745,12 @@ const CHILDREN = [
   {id:'D-02-2',pid:'D-02',cat:'メルマガ',name:'配信設定',score:15},
   {id:'D-03-1',pid:'D-03',cat:'メルマガ',name:'配信',score:10},
   {id:'D-03-2',pid:'D-03',cat:'メルマガ',name:'配信報告',score:5},
+  {id:'E-01-1',pid:'E-01',cat:'博士課程入試説明会',name:'申込みフォーム作成（事前アンケート含まない）（約2時間）',score:20},
+  {id:'E-01-2',pid:'E-01',cat:'博士課程入試説明会',name:'申込キャンセルフォーム作成（約30分）',score:5},
+  {id:'E-02-1',pid:'E-02',cat:'博士課程入試説明会',name:'申し込み受付管理者メール設定（約15分）',score:3},
+  {id:'E-02-2',pid:'E-02',cat:'博士課程入試説明会',name:'申し込み受付自動返信メール設定（当日詳細含む・約1時間）',score:15},
+  {id:'E-02-3',pid:'E-02',cat:'博士課程入試説明会',name:'キャンセル受付管理者メール設定（約15分）',score:3},
+  {id:'E-02-4',pid:'E-02',cat:'博士課程入試説明会',name:'キャンセル受付自動返信メール設定（約15分）',score:3},
 ];
 
 // ─── Timing windows for reminders ────────────────────────────────────────────
@@ -1579,7 +1588,8 @@ function samplePlaceholder(cat) {
     '入試説明会': '第◯回入試説明会',
     'イベント': '青山XXXXXフォーラム',
     '入試': 'A方式 第◯期',
-    'メルマガ': 'Vol.XXX'
+    'メルマガ': 'Vol.XXX',
+    '博士課程入試説明会': '博士課程 第◯回入試説明会',
   };
   return samples[cat] || cat;
 }
