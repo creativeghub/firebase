@@ -674,6 +674,7 @@ const CATEGORIES = [
   { id:'C', name:'入試',       icon:'📚', color:'#f59e0b', leadDays:21, followDays:3,  unit:'回' },
   { id:'D', name:'メルマガ',   icon:'📧', color:'#10b981', leadDays:7,  followDays:1,  unit:'号' },
   { id:'E', name:'博士課程入試説明会', icon:'🎓', color:'#6366f1', leadDays:21, followDays:2, unit:'回' },
+  { id:'F', name:'入試申込リマインドメール', icon:'📬', color:'#ec4899', leadDays:16, followDays:1, unit:'期' },
 ];
 
 const PARENTS = [
@@ -695,6 +696,8 @@ const PARENTS = [
   {id:'D-03',cat:'メルマガ',timing:'当日〜配信後',work:'配信、配信報告、履歴整理',score:15},
   {id:'E-01',cat:'博士課程入試説明会',timing:'2〜3週間前',work:'申込みフォーム・キャンセルフォーム作成（事前アンケートなし）',score:25},
   {id:'E-02',cat:'博士課程入試説明会',timing:'1〜2週間前',work:'各種受付メール設定（管理者通知・自動返信）',score:24},
+  {id:'F-01',cat:'入試申込リマインドメール',timing:'配信2週間前',work:'原稿確認依頼',score:10},
+  {id:'F-02',cat:'入試申込リマインドメール',timing:'配信当日',work:'配信設定・配信・報告',score:10},
 ];
 
 const CHILDREN = [
@@ -748,6 +751,9 @@ const CHILDREN = [
   {id:'E-02-2',pid:'E-02',cat:'博士課程入試説明会',name:'申し込み受付自動返信メール設定（当日詳細含む・約1時間）',score:15},
   {id:'E-02-3',pid:'E-02',cat:'博士課程入試説明会',name:'キャンセル受付管理者メール設定（約15分）',score:3},
   {id:'E-02-4',pid:'E-02',cat:'博士課程入試説明会',name:'キャンセル受付自動返信メール設定（約15分）',score:3},
+  {id:'F-01-1',pid:'F-01',cat:'入試申込リマインドメール',name:'原稿確認依頼（配信日の2週間前までに完了）',score:10},
+  {id:'F-02-1',pid:'F-02',cat:'入試申込リマインドメール',name:'配信設定',score:5},
+  {id:'F-02-2',pid:'F-02',cat:'入試申込リマインドメール',name:'配信・報告',score:5},
 ];
 
 // ─── Timing windows for reminders ────────────────────────────────────────────
@@ -771,6 +777,8 @@ const TIMING_WINDOWS = {
   '前日':                { start: 2,  end: 1 },
   '開催翌日':            { start: 0,  end: -1 },
   '開催後2週間以内':     { start: -1, end: -14 },
+  '配信2週間前':         { start: 21, end: 14 },
+  '配信当日':            { start: 1,  end: 0 },
 };
 
 // ─── Firebase Setup ──────────────────────────────────────────────────────────
@@ -1591,6 +1599,7 @@ function samplePlaceholder(cat) {
     '入試': 'A方式 第◯期',
     'メルマガ': 'Vol.XXX',
     '博士課程入試説明会': '博士課程 第◯回入試説明会',
+    '入試申込リマインドメール': '第◯期（紐づく入試説明会名）',
   };
   return samples[cat] || cat;
 }
